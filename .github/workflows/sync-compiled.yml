@@ -1,0 +1,67 @@
+name: Sync compiled branch
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-compiled
+  cancel-in-progress: true
+
+jobs:
+  sync-compiled:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Build the PDF converter image
+        working-directory: convertor
+        run: docker compose build
+
+      - name: Convert each topic README.md to README.pdf
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r -d '' md; do
+            dir="$(dirname "$md")"
+
+            rm -f convertor/workdir/*.md convertor/workdir/*.pdf
+
+            cp "$md" convertor/workdir/README.md
+
+            (cd convertor && docker compose run --rm -T md2pdf README.md README.pdf < /dev/null)
+
+            if [ ! -f convertor/workdir/README.pdf ]; then
+              echo "ERROR: PDF was not generated for $md" >&2
+              exit 1
+            fi
+
+            mv convertor/workdir/README.pdf "$dir/README.pdf"
+
+            rm -f "$md"
+
+            echo "Converted: $md -> $dir/README.pdf"
+          done < <(find topics -type f -name 'README.md' -print0)
+
+      - name: Commit and force-push as a single commit to compiled
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Start a fresh orphan branch so no history is carried over
+          git checkout --orphan compiled
+
+          git add -A
+          git commit -m "chore: sync compiled branch from main (${GITHUB_SHA:0:7})"
+
+          git push origin HEAD:compiled --force
