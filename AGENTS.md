@@ -20,7 +20,7 @@ Read the skill's `SKILL.md` before running it; the rules there are authoritative
 
 #### `.github/`
 
-Holds the single workflow `workflows/sync-compiled.yml`. It runs on every push to `main`, renders each `topics/*/README.md` to PDF via the `convertor/` pipeline, and force-pushes everything as a single squashed commit to the orphan branch `compiled`. `complied` is CI-owned; do not edit it manually. `workflows/sync-compiled.yml` mirrors the origin main branch to the orphan compiled branch, replacing all the markdown files under `topics/` with their PDF equivalents. The workflow is triggered by pushes to `main`.
+Holds the single workflow `workflows/sync-compiled.yml`. It runs on every push to `main`, renders each `topics/*/README.md` to PDF via the `convertor/` pipeline, and force-pushes everything as a single squashed commit to the orphan branch `compiled`. `compiled` is CI-owned; do not edit it manually. `workflows/sync-compiled.yml` mirrors the origin main branch to the orphan compiled branch, replacing all the markdown files under `topics/` with their PDF equivalents. The workflow is triggered by pushes to `main`.
 
 #### `convertor/`
 
