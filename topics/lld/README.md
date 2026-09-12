@@ -8962,3 +8962,271 @@ sequenceDiagram
 - The collection hands out a fresh iterator; multiple iterators can walk the same collection independently.
 - Different iterators on the same collection support different traversal orders.
 - In modern C++, prefer the standard library's iterators; the pattern is most useful when the collection has a non-trivial structure that the standard cannot express.
+
+# Flyweight Design Pattern
+
+The Flyweight pattern is a structural pattern that lets you fit more objects into RAM by sharing common parts of state between multiple objects — it is purely a memory optimization. The pattern splits an object's state into two kinds: intrinsic state (shared, immutable, context-free data that lives in the flyweight) and extrinsic state (unique, mutable, per-instance data passed in at call time). Sharing intrinsic state drastically reduces the number of live objects, especially when you need thousands of similar objects.
+
+## Intent
+
+Use sharing to support large numbers of fine-grained objects efficiently. Separate an object's state into intrinsic (shareable, context-free) and extrinsic (unique, context-dependent) parts; store intrinsic state in a shared flyweight; pass extrinsic state in at runtime so the flyweight can simulate a full object.
+
+In plainer terms: a text editor with a million characters does not need a million character objects — each letter is a flyweight (`'a'`, `'b'`, `'c'`) shared by every occurrence of that letter. The font, size, and style are the intrinsic state living in the flyweight; the position on the page is the extrinsic state passed in at draw time. One `'a'` object serves the entire document.
+
+## The Problem It Solves
+
+When an application needs to create thousands or millions of objects that share most of their data, naive instantiation exhausts RAM. The shared data is identical across objects — storing it in every instance is pure waste. The solution is to extract the shared data into a single shared object (the flyweight) and pass the unique per-instance data in at the point of use.
+
+### A Million Tree Nodes, Each Storing the Same Texture
+
+This forest renderer stores the texture name in every single tree, so a million trees carry a million copies of the same string:
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+
+struct TreeNode {
+    double x, y;      // position — unique per tree
+    double height;    // unique per tree
+    std::string texture;  // the SAME string for every tree!
+};
+
+void renderAll(const std::vector<TreeNode>& trees) {
+    for (const auto& t : trees) {
+        std::cout << "Render tree at (" << t.x << "," << t.y
+                  << ") height=" << t.height
+                  << " texture=" << t.texture << std::endl;
+    }
+}
+
+int main() {
+    std::vector<TreeNode> forest;
+    // A million trees — each carries "pine_bark.png" redundantly
+    for (int i = 0; i < 3; ++i) {
+        forest.push_back({double(i), double(i * 2), 50.0, "pine_bark.png"});
+    }
+    renderAll(forest);
+}
+```
+
+```text
+Render tree at (0,0) height=50 texture=pine_bark.png
+Render tree at (1,2) height=50 texture=pine_bark.png
+Render tree at (2,4) height=50 texture=pine_bark.png
+```
+
+This naive approach causes several problems:
+
+- **Massive memory waste** — the same texture string is stored in every instance.
+- **Object explosion** — a million trees mean a million object allocations, even though only the positions differ.
+- **Cache pressure** — more objects means worse cache locality, slower iteration.
+- **Breaks the Single Responsibility Principle** — each tree object manages both its unique position and shared texture data.
+
+## The Solution
+
+Factor each object into two pieces: a **Flyweight** that holds the shared, immutable intrinsic state (the texture, color, and mesh), and an **ExtrinsicContext** that supplies the unique per-instance data (the position). A **FlyweightFactory** caches flyweights so that identical intrinsic states yield the same flyweight object. The client passes extrinsic data in at the point of use, and the flyweight uses it to simulate a full object.
+
+### Participants
+
+- **Flyweight** — the shared object holding intrinsic (immutable, context-free) state (e.g. `TreeType` with texture, color, mesh).
+- **FlyweightFactory** — creates and caches flyweights; returns an existing flyweight if the intrinsic state has been requested before.
+- **Client** — creates or obtains flyweights from the factory and supplies extrinsic state at the point of use (position, height).
+
+### Structure
+
+```mermaid
+classDiagram
+    class TreeType {
+        <<flyweight>>
+        -texture: string
+        -color: string
+        +draw(x, y, height) void
+    }
+    class TreeTypeFactory {
+        -pool: map~string, TreeType~
+        +getTreeType(texture, color) TreeType
+    }
+    class Tree {
+        -x: double
+        -y: double
+        -height: double
+        -type: TreeType
+        +draw() void
+    }
+    TreeTypeFactory ..> TreeType : creates and caches
+    Tree --> TreeType : uses (extrinsic passed in)
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <memory>
+
+// Flyweight: holds intrinsic state — shared across all trees of the same type.
+class TreeType {
+private:
+    std::string texture;
+    std::string color;
+public:
+    TreeType(const std::string& tex, const std::string& col)
+        : texture(tex), color(col) {}
+
+    // Draw uses intrinsic state (texture, color) plus extrinsic (x, y, height)
+    // passed in from the client.
+    void draw(double x, double y, double height) const {
+        std::cout << "  Draw " << color << " tree at (" << x << "," << y
+                  << ") h=" << height
+                  << " texture=" << texture << std::endl;
+    }
+};
+
+// FlyweightFactory: creates and caches flyweights. Identical intrinsic states
+// return the same flyweight object — no duplication.
+class TreeTypeFactory {
+private:
+    std::unordered_map<std::string, std::shared_ptr<TreeType>> pool;
+    static std::string key(const std::string& t, const std::string& c) {
+        return t + "#" + c;
+    }
+public:
+    std::shared_ptr<TreeType> getTreeType(const std::string& texture,
+                                           const std::string& color) {
+        auto k = key(texture, color);
+        auto it = pool.find(k);
+        if (it == pool.end()) {
+            auto ft = std::make_shared<TreeType>(texture, color);
+            pool[k] = ft;
+            std::cout << "[Factory] Created new TreeType: " << k << std::endl;
+            return ft;
+        }
+        std::cout << "[Factory] Reused existing TreeType: " << k << std::endl;
+        return it->second;
+    }
+};
+
+// Client: each tree holds only its extrinsic state + a shared TreeType pointer.
+class Tree {
+private:
+    double x, y;
+    double height;
+    std::shared_ptr<TreeType> type;
+public:
+    Tree(double xPos, double yPos, double h,
+         std::shared_ptr<TreeType> t)
+        : x(xPos), y(yPos), height(h), type(t) {}
+
+    void draw() const {
+        // The tree delegates drawing to its flyweight, passing extrinsic
+        // state (position, height) at call time.
+        type->draw(x, y, height);
+    }
+};
+
+// A forest holds trees — each tree is tiny; the shared TreeType objects
+// are the only significant memory cost.
+class Forest {
+private:
+    std::vector<Tree> trees;
+    TreeTypeFactory factory;
+public:
+    void plantTree(double x, double y, double height,
+                   const std::string& texture,
+                   const std::string& color) {
+        auto type = factory.getTreeType(texture, color);
+        trees.emplace_back(x, y, height, type);
+    }
+
+    void draw() const {
+        std::cout << "=== Drawing forest of " << trees.size()
+                  << " trees ===" << std::endl;
+        for (const auto& t : trees) {
+            t.draw();
+        }
+    }
+};
+
+int main() {
+    Forest f;
+    // Plant three trees — two share the same type, one is different.
+    // The factory creates only 2 TreeType objects, not 3.
+    f.plantTree(10, 20, 50, "pine_bark.png", "green");
+    f.plantTree(15, 25, 60, "pine_bark.png", "green");  // reused
+    f.plantTree(30, 40, 70, "oak_bark.png",  "autumn");
+}
+```
+
+```text
+[Factory] Created new TreeType: pine_bark.png#green
+[Factory] Reused existing TreeType: pine_bark.png#green
+[Factory] Created new TreeType: oak_bark.png#autumn
+=== Drawing forest of 3 trees ===
+  Draw green tree at (10,20) h=50 texture=pine_bark.png
+  Draw green tree at (15,25) h=60 texture=pine_bark.png
+  Draw autumn tree at (30,40) h=70 texture=oak_bark.png
+```
+
+## How It Works
+
+The factory is the gatekeeper: before creating a new flyweight, it checks whether an identical one already exists in the pool. If it does, the factory returns the existing flyweight — the client gets the same `shared_ptr<TreeType>` for both trees of type `"pine_bark.png#green"`. The flyweight itself never stores the extrinsic state (position, height); it receives those values as parameters in its operation (`draw()`). This means one flyweight object correctly simulates many tree objects, with each tree contributing its unique position and height at draw time.
+
+```mermaid
+sequenceDiagram
+    participant Client as Forest
+    participant Factory as TreeTypeFactory
+    participant Flyweight as TreeType
+    participant Tree
+
+    Client->>Factory: getTreeType("pine_bark.png", "green")
+    Factory->>Flyweight: new TreeType()
+    Factory-->>Client: shared_ptr<TreeType>
+    Client->>Tree: new Tree(x,y,height,type)
+    Tree-->>Client: tree created
+    Client->>Tree: draw()
+    Tree->>Flyweight: draw(x, y, height)
+    Note over Flyweight: intrinsic: texture, color
+    Note over Flyweight: extrinsic: x, y, height (passed in)
+```
+
+## When to Use
+
+- When an application needs to produce a large number of objects (thousands to millions) that share most of their data.
+- When the memory cost per object is significant and the shared state dominates the per-object state.
+- When an object can be described by a combination of a small intrinsic state and a larger extrinsic state.
+- When the shared state can be made immutable (or effectively immutable — intrinsics should not change after creation).
+
+## When Not to Use
+
+- When the number of objects is small — the factory overhead and added complexity are not worth the memory saving.
+- When the shared state does not dominate — if most of the object is unique anyway, there is little to share.
+- When extrinsic state must be stored inside the object — flyweight requires extrinsic state to be passed in at the point of use; objects that must be self-contained cannot use this pattern.
+- When memory pressure is not a real problem — the pattern is an optimization; premature use adds indirection without benefit.
+
+## Real-World Examples
+
+- **Text editors** — a document with millions of characters stores one flyweight per glyph (font, size, style); character positions are extrinsic and live in the layout engine.
+- **Game trees and scenery** — a forest of 100,000 trees shares a handful of `TreeType` flyweights (bark texture, leaf mesh); each tree instance stores only its position, rotation, and scale.
+- **GUI icon libraries** — one `Icon` flyweight per icon type; each button or menu item references its icon flyweight rather than storing the bitmap.
+- **Spreadsheet cells** — cells sharing the same format (bold, 12pt, blue) share a `CellFormat` flyweight; each cell stores only its value and a pointer to the shared format.
+- **Networking packet headers** — multiple packets share the same header template flyweight; only the payload and sequence number are extrinsic.
+
+## Relationship to Other Patterns
+
+- **Flyweight vs Singleton** — both share instances, but a Singleton has one instance globally; a FlyweightFactory manages a pool of many shareable flyweights keyed by their intrinsic state.
+- **Flyweight + Composite** — a composite node can be a flyweight when its children are extrinsic; the tree structure is shared, and only leaf identities are unique.
+- **Flyweight + Factory** — the factory is essential to the pattern; it manages the flyweight pool and ensures identical intrinsic states return the same object.
+- **Flyweight vs Object Pool** — both reuse objects, but an Object Pool recycles objects for performance; Flyweight separates intrinsic from extrinsic state for memory sharing.
+- **Flyweight + State** — a State object is often a flyweight when the state machine has many contexts sharing the same transition logic.
+
+## Key Points
+
+- Flyweight is purely a memory optimization — it reduces RAM by sharing the intrinsic state of many objects.
+- Intrinsic state is shareable, immutable, and context-free; extrinsic state is unique and passed in at the point of use.
+- The FlyweightFactory caches flyweights and returns existing instances for identical intrinsic states.
+- The client must not store extrinsic state inside the flyweight — it is passed in as parameters to flyweight operations.
+- The pattern trades memory for a small amount of indirection and factory overhead; use it when the memory saving is significant.
+
+# State Design Pattern
