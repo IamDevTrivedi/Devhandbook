@@ -168,41 +168,6 @@ Student Major: Computer Science
 - **Reusable**: Create multiple instances of the `Student` class to store information for different students without creating new variables for each attribute.
 - **Effective modeling**: The `Student` class encapsulates the attributes and behaviors of a student, making it easier to manage and understand the data.
 
-# Important Concepts in OOP
-
-OOP allows you to create classes that represent real-world entities, making your code more organized, reusable, and easier to maintain. It promotes key principles:
-
-- **Encapsulation**: Bundle data and methods together
-- **Inheritance**: Build new classes from existing ones
-- **Polymorphism**: Use objects in flexible ways
-
-These principles are fundamental to creating robust and scalable software applications.
-
-## Key Language Features Covered in This Document
-
-Beyond the four pillars, this document covers the C++ language features that make OOP work in practice:
-
-| Concept                    | Section                                           |
-| ------------------------- | ------------------------------------------------- |
-| Classes & Objects         | Declaration of a Class and Object                  |
-| Access Modifiers          | Access Modifiers                                   |
-| Constructors & Destructors | Constructors, Destructor                            |
-| RAII                      | RAII — Resource Acquisition Is Initialization       |
-| Copy & Move Semantics     | Rule of Three, Five, and Zero                     |
-| Copy Elision              | Copy Elision and Return Value Optimization (RVO)  |
-| Smart Pointers            | Smart Pointers                                     |
-| Virtual Functions          | Polymorphism                                       |
-| Object Slicing            | Object Slicing                                     |
-| `const` Correctness        | `const` Keyword                                    |
-| Type Deduction            | `auto` and `decltype`                             |
-| Compile-Time Computation   | `constexpr`                                        |
-| Exceptions & RAII         | Exception Handling in OOP                          |
-| Templates                 | Class Templates — Generic Programming              |
-| Design Patterns           | Object-Oriented Design Patterns                     |
-| Coupling & Cohesion        | Coupling and Cohesion                              |
-| UML Diagrams              | UML Class Diagrams                                 |
-| Common Pitfalls           | Common OOP Mistakes and How to Avoid Them          |
-
 # Declaration of a Class and Object
 
 In OOP, a class is a blueprint for creating objects. It defines the properties (attributes) and behaviors (methods) that the objects created from the class will have. An object is an instance of a class, meaning it is a specific realization of the class with actual values for its attributes.
@@ -4752,8 +4717,6 @@ a != b: true
 ```
 
 The compiler compares each member in declaration order, lexicographically. Custom comparison logic is also possible by writing your own implementation.
-
----
 
 ## Method Overriding and Virtual Functions
 

@@ -7388,7 +7388,6 @@ sequenceDiagram
 - The proxy often holds a pointer to the real subject and is responsible for its lifetime.
 - It is the structural answer to "I want to add a policy around an object without changing it."
 
-
 # Chain of Responsibility Design Pattern
 
 The Chain of Responsibility pattern is a behavioral pattern that lets you pass a request along a chain of handlers. Each handler decides either to process the request or to forward it to the next handler in the chain. The client that issues the request does not know — and does not need to know — which handler finally acts on it. The pattern is the structural answer to "many objects may handle a request, and the handler is not known in advance."
@@ -9230,3 +9229,13 @@ sequenceDiagram
 - The pattern trades memory for a small amount of indirection and factory overhead; use it when the memory saving is significant.
 
 # State Design Pattern
+
+# Mediator Design Pattern
+
+# Prototype Design Pattern
+
+# Visitor Design Pattern
+
+# Memento Design Pattern
+
+# Null Object Pattern
