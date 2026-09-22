@@ -9065,7 +9065,8 @@ classDiagram
 #include <unordered_map>
 #include <memory>
 
-// Flyweight: holds intrinsic state — shared across all trees of the same type.
+// Flyweight: holds intrinsic state — shared across all trees of the
+// same type.
 class TreeType {
 private:
     std::string texture;
@@ -9074,7 +9075,8 @@ public:
     TreeType(const std::string& tex, const std::string& col)
         : texture(tex), color(col) {}
 
-    // Draw uses intrinsic state (texture, color) plus extrinsic (x, y, height)
+    // Draw uses intrinsic state (texture, color) plus extrinsic
+    // (x, y, height)
     // passed in from the client.
     void draw(double x, double y, double height) const {
         std::cout << "  Draw " << color << " tree at (" << x << "," << y
@@ -9107,7 +9109,8 @@ public:
     }
 };
 
-// Client: each tree holds only its extrinsic state + a shared TreeType pointer.
+// Client: each tree holds only its extrinsic state + a shared
+// TreeType pointer.
 class Tree {
 private:
     double x, y;
@@ -9230,7 +9233,648 @@ sequenceDiagram
 
 # State Design Pattern
 
+State is a behavioral design pattern that lets an object change its behavior when its internal state changes. It appears as if the object changed its class. Instead of stuffing every state-dependent branch into a giant conditional, State moves each state into its own class and delegates work to it. This section covers the intent, the problem the pattern solves, the standard structure, a complete C++ implementation, and the situations where the pattern earns its keep.
+
+## Intent
+
+Allow an object to alter its behavior when its internal state changes. The object will appear to change its class. State wraps each state into a separate class and delegates state-specific behavior to the current state object, so the context never needs a monolithic conditional.
+
+In plainer terms: a vending machine behaves differently when it is `Idle`, `HasCoin`, or `Dispensing`. Instead of one `VendingMachine` class with a sprawling `switch` on state, each state becomes its own class — `IdleState`, `HasCoinState`, `DispensingState` — and the machine delegates to whichever state it is in.
+
+## The Problem It Solves
+
+When an object's behavior depends on its state, the tempting approach is a single class with a large conditional — an `if/else` or `switch` on the state variable. Every new state means adding another branch, and every new behavior for an existing state means touching all the other branches. The conditional spreads across the class and grows with every new state and every new action.
+
+### A Context Full of Conditionals
+
+This vending machine chooses behavior with a `switch` on its `State` enum; every new state and every new action means reopening the class:
+
+```cpp
+#include <iostream>
+#include <string>
+
+enum class State { Idle, HasCoin, Dispensing };
+
+class VendingMachine {
+    State state;
+    int balance;
+public:
+    VendingMachine() : state(State::Idle), balance(0) {}
+
+    void insertCoin(int amount) {
+        if (state == State::Idle) {
+            balance += amount;
+            state = State::HasCoin;
+            std::cout << "Inserted " << amount << "; balance: "
+                      << balance << "\n";
+        } else if (state == State::HasCoin) {
+            balance += amount;
+            std::cout << "Inserted " << amount << "; balance: "
+                      << balance << "\n";
+        } else {
+            std::cout << "Cannot insert coin while dispensing\n";
+        }
+    }
+
+    void selectProduct() {
+        if (state == State::HasCoin && balance >= 50) {
+            balance -= 50;
+            state = State::Dispensing;
+            std::cout << "Dispensing product; remaining: " << balance << "\n";
+            state = State::Idle;
+            std::cout << "Returned change: " << balance << "\n";
+            balance = 0;
+        } else if (state == State::Idle) {
+            std::cout << "Insert a coin first\n";
+        } else {
+            std::cout << "Insufficient balance\n";
+        }
+    }
+
+    State getState() const { return state; }
+};
+
+int main() {
+    VendingMachine vm;
+    vm.insertCoin(30);
+    vm.insertCoin(20);
+    vm.selectProduct();
+    vm.selectProduct();
+}
+```
+
+```text
+Inserted 30; balance: 30
+Inserted 20; balance: 50
+Dispensing product; remaining: 0
+Returned change: 0
+Insert a coin first
+```
+
+This conditional-heavy approach causes several problems:
+
+- **Breaks the Open/Closed Principle** — every new state or action reopens `VendingMachine`; existing methods must be edited and re-tested.
+- **Bloats the context** — one class owns every state's logic, so it has many reasons to change.
+- **Hard to test in isolation** — you cannot unit-test the `HasCoin` behavior without pulling in the whole `VendingMachine`.
+- **Duplication risk** — state-specific setup and teardown logic is scattered across many branches and repeated.
+
+## The Solution
+
+Define a `State` interface with every action the context can perform, and give each concrete state its own class. The `Context` holds a reference to the current `State` and delegates every state-dependent call to it. When a state transition occurs, the context swaps its state reference — the context itself does not change, and neither does any existing state class. Adding a new state means adding a new class, not editing the context.
+
+### Participants
+
+- **Context** — `VendingMachine`; holds a reference to the current `State` and delegates state-specific work to it; exposes a way to change state at runtime.
+- **State** — the interface every state implements (`insertCoin()`, `selectProduct()`, `getState()`).
+- **Concrete states** — `IdleState`, `HasCoinState`, `DispensingState`; each implements the behavior for one state and may trigger transitions by calling `setState()` on the context.
+
+### Structure
+
+```mermaid
+classDiagram
+    class VendingMachine {
+        -state: State
+        -balance: int
+        +insertCoin(amount) void
+        +selectProduct() void
+        +setState(state: State) void
+    }
+    class State {
+        <<interface>>
+        +insertCoin(vm: VendingMachine, amount) void
+        +selectProduct(vm: VendingMachine) void
+    }
+    class IdleState {
+        +insertCoin(vm, amount) void
+        +selectProduct(vm) void
+    }
+    class HasCoinState {
+        +insertCoin(vm, amount) void
+        +selectProduct(vm) void
+    }
+    class DispensingState {
+        +insertCoin(vm, amount) void
+        +selectProduct(vm) void
+    }
+    VendingMachine --> State : delegates to
+    State <|-- IdleState
+    State <|-- HasCoinState
+    State <|-- DispensingState
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <memory>
+
+// Forward declaration
+class VendingMachine;
+
+// State: the interface every concrete state implements.
+class State {
+public:
+    virtual void insertCoin(VendingMachine* vm, int amount) = 0;
+    virtual void selectProduct(VendingMachine* vm) = 0;
+    virtual ~State() = default;
+};
+
+// Concrete state: idle — waiting for a coin.
+class IdleState : public State {
+public:
+    void insertCoin(VendingMachine* vm, int amount) override;
+    void selectProduct(VendingMachine* vm) override;
+};
+
+// Concrete state: has coin — ready to dispense.
+class HasCoinState : public State {
+public:
+    void insertCoin(VendingMachine* vm, int amount) override;
+    void selectProduct(VendingMachine* vm) override;
+};
+
+// Concrete state: dispensing — product is being released.
+class DispensingState : public State {
+public:
+    void insertCoin(VendingMachine* vm, int amount) override;
+    void selectProduct(VendingMachine* vm) override;
+};
+
+// Context: holds a state reference and delegates to it.
+class VendingMachine {
+    std::unique_ptr<State> state;
+    int balance;
+public:
+    VendingMachine() : state(std::make_unique<IdleState>()), balance(0) {}
+
+    void setState(std::unique_ptr<State> s) { state = std::move(s); }
+
+    void insertCoin(int amount) { state->insertCoin(this, amount); }
+    void selectProduct() { state->selectProduct(this); }
+
+    void addBalance(int amount) { balance += amount; }
+    int getBalance() const { return balance; }
+    void resetBalance() { balance = 0; }
+
+    State* getState() const { return state.get(); }
+};
+
+void IdleState::insertCoin(VendingMachine* vm, int amount) {
+    vm->addBalance(amount);
+    vm->setState(std::make_unique<HasCoinState>());
+    std::cout << "Inserted " << amount << "; balance: "
+                << vm->getBalance() << "\n";
+}
+
+void IdleState::selectProduct(VendingMachine* vm) {
+    std::cout << "Insert a coin first\n";
+}
+
+void HasCoinState::insertCoin(VendingMachine* vm, int amount) {
+    vm->addBalance(amount);
+    std::cout << "Inserted " << amount << "; balance: "
+                << vm->getBalance() << "\n";
+}
+
+void HasCoinState::selectProduct(VendingMachine* vm) {
+    if (vm->getBalance() >= 50) {
+        vm->setState(std::make_unique<DispensingState>());
+        std::cout << "Dispensing product; remaining: "
+                  << vm->getBalance() - 50 << "\n";
+        vm->resetBalance();
+        vm->setState(std::make_unique<IdleState>());
+        std::cout << "Returned change: 0\n";
+    } else {
+        std::cout << "Insufficient balance\n";
+    }
+}
+
+void DispensingState::insertCoin(VendingMachine* vm, int amount) {
+    std::cout << "Cannot insert coin while dispensing\n";
+}
+
+void DispensingState::selectProduct(VendingMachine* vm) {
+    std::cout << "Already dispensing\n";
+}
+
+int main() {
+    VendingMachine vm;
+    vm.insertCoin(30);
+    vm.insertCoin(20);
+    vm.selectProduct();
+    vm.selectProduct();
+}
+```
+
+```text
+Inserted 30; balance: 30
+Inserted 20; balance: 50
+Dispensing product; remaining: 0
+Returned change: 0
+Insert a coin first
+```
+
+## How It Works
+
+The client creates a `VendingMachine` (which starts in `IdleState`). Each call to `insertCoin()` or `selectProduct()` is forwarded to the current state's method. When the state changes — `IdleState::insertCoin` transitions to `HasCoinState` — the context swaps its internal state reference. The client never calls state-transition logic directly; it delegates, and the current state decides what happens next.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant VM as VendingMachine
+    participant Idle as IdleState
+    participant HasCoin as HasCoinState
+    participant Dispensing as DispensingState
+
+    Client->>VM: insertCoin(30)
+    VM->>Idle: insertCoin(vm, 30)
+    Idle->>VM: setState(HasCoinState)
+
+    Client->>VM: insertCoin(20)
+    VM->>HasCoin: insertCoin(vm, 20)
+
+    Client->>VM: selectProduct()
+    VM->>HasCoin: selectProduct(vm)
+    HasCoin->>VM: setState(DispensingState)
+    VM->>VM: resetBalance, setState(IdleState)
+```
+
+## When to Use
+
+- When an object's behavior depends on its state, and it must change its behavior at runtime depending on that state.
+- When a large conditional branches on the object's state — the conditional can be replaced with state classes.
+- When state-specific behavior and transitions are scattered across many methods in a single class.
+- When multiple contexts share the same state machine — each state class can be reused.
+
+## When Not to Use
+
+- When there are only two or three states and they never change — a simple boolean or enum conditional is clearer.
+- When states have no distinct behavior — the pattern adds classes without benefit.
+- When the number of states is very large and transitions are complex — a statechart or state-transition table may be more appropriate than the State pattern alone.
+- When states are stateless — if a state class has no instance variables, a Flyweight or a simple enum-based dispatch may be simpler.
+
+## Real-World Examples
+
+- **Vending machines** — transitions between `Idle`, `HasCoin`, `Sold`, and `OutOfStock` states, each with distinct behavior for coin insertion and product selection.
+- **TCP connection states** — `CLOSED`, `LISTEN`, `SYN_SENT`, `ESTABLISHED`, `FIN_WAIT`; each state handles incoming segments differently.
+- **Document editors** — a document in `Editable`, `ReadOnly`, or `Locked` state responds differently to save, edit, and delete operations.
+- **Traffic lights** — `Red`, `Yellow`, `Green` states, each controlling which light is on and when the next transition occurs.
+- **Order lifecycle** — `Pending`, `Paid`, `Shipped`, `Delivered`, `Cancelled`; each state allows different actions (cancel only while pending, ship only when paid).
+
+## Relationship to Other Patterns
+
+- **State vs Strategy** — both delegate to a class behind an interface, but Strategy lets the client choose the strategy, while State lets the state itself decide the next state; the transition logic is internal to the pattern.
+- **State vs Flyweight** — a State object is often a flyweight when many contexts share the same state machine logic; the distinction is that State cares about behavior, while Flyweight cares about memory sharing.
+- **State + Finite State Machine (FSM)** — State is a way to implement an FSM; each state class corresponds to a state in the FSM, and transitions are methods that call `setState()`.
+- **State vs Command** — State changes the object's own behavior; Command encapsulates a request as an object for another object to execute.
+- **State + Observer** — state transitions can trigger notifications to observers, combining State's behavior change with Observer's event propagation.
+
+## Key Points
+
+- State replaces a large conditional with a hierarchy of state classes; each state class encapsulates the behavior for one state.
+- The context delegates state-specific work to the current state object; the context does not contain any state-dependent branches.
+- Transitions happen inside state classes — a state decides what the next state should be by calling `setState()` on the context.
+- The pattern makes adding a new state easy: add a new class and wire it in; the context and existing states stay unchanged.
+- State is about behavior that changes with state; Strategy is about algorithms chosen by the client; do not confuse the two.
+
 # Mediator Design Pattern
+
+Mediator is a behavioral design pattern that reduces chaotic dependencies between objects by introducing a mediator object that encapsulates how a set of objects interact. Instead of objects communicating directly with each other, they communicate through the mediator, which centralizes complex communication and control logic. This section covers the intent, the problem the pattern solves, the standard structure, a complete C++ implementation, and the situations where the pattern earns its keep.
+
+## Intent
+
+Define an object that encapsulates how a set of objects interact. Mediator promotes loose coupling by keeping objects from referring to each other explicitly, and it lets you vary their interaction independently. The mediator handles communication between colleague objects, so they don't need to know about each other.
+
+In plainer terms: instead of components in a chat application directly referencing each other (users, rooms, administrators, notifications), they all communicate through a central ChatMediator that routes messages, manages user presence, and handles administrative actions.
+
+## The Problem It Solves
+
+When a group of objects needs to communicate, the tempting approach is to have each object hold references to the others it needs to talk to. This creates a tangled web of pairwise dependencies — every time you add a new object or change communication logic, you must update many other objects. The system becomes hard to maintain, test, and extend because changes ripple across the entire network.
+
+### A Chat Application with Direct References
+
+This chat application lets objects reference each other directly, so adding a new feature means editing every participant:
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+
+class User;
+class ChatRoom;
+class Admin;
+class NotificationService;
+
+class User {
+    std::string name;
+    ChatRoom* room;
+    Admin* admin;
+    NotificationService* notifications;
+public:
+    User(std::string n, ChatRoom* r, Admin* a, NotificationService* nf)
+        : name(n), room(r), admin(a), notifications(nf) {}
+
+    void sendMessage(const std::string& msg) {
+        std::cout << name << ": " << msg << "\n";
+        // Notify everyone in room
+        // Notify admin for moderation
+        // Send notification
+        // ... complex logic scattered everywhere
+    }
+
+    void receiveMessage(const std::string& from, const std::string& msg) {
+        std::cout << "[" << from << "] " << msg << "\n";
+    }
+
+    // ... many more methods that need to talk to other objects
+};
+```
+
+```text
+// Adding a new feature like "message editing" requires:
+// - Adding editMessage() to User
+// - Adding permission checks in Admin  
+// - Adding notification logic in NotificationService
+// - Updating every object that references these classes
+```
+
+This direct-reference approach causes several problems:
+
+- **Exponential complexity** — each new object increases connections quadratically (n² relationships)
+- **Violates Single Responsibility Principle** — objects end up doing both their core job and managing communications
+- **Hard to change communication logic** — modifying how messages are routed requires touching every participant
+- **Tight coupling** — you cannot reuse a User in a different chat system without dragging along all its dependencies
+- **Difficult to test** — you must instantiate the entire object graph to test a single component
+
+## The Solution
+
+Introduce a `Mediator` interface that defines communication methods, and a `ConcreteMediator` that implements them by coordinating colleague objects. Each colleague holds only a reference to the mediator (not to other colleagues), and communicates by calling the mediator. The mediator contains the interaction logic and knows how to route requests between colleagues.
+
+### Participants
+
+- **Mediator** — the interface defining methods for communicating with colleagues (`sendMessage()`, `addUser()`, `removeUser()`, etc.)
+- **ConcreteMediator** — `ChatMediator`; knows all colleagues and implements coordination logic
+- **Colleague** — the interface each participant implements (`send()`, `receive()`)
+- **Concrete colleagues** — `User`, `Admin`, `NotificationService`; each knows only the mediator and delegates communication to it
+
+### Structure
+
+```mermaid
+classDiagram
+    class ChatMediator {
+        -users: vector<User*>
+        -admins: vector<Admin*>
+        -notifications: NotificationService*
+        +sendMessage(msg, user) void
+        +addUser(user) void
+        +removeUser(user) void
+        +notifyAdmin(msg) void
+    }
+    class Mediator {
+        <<interface>>
+        +sendMessage(message, sender) void
+        +addColleague(colleague) void
+        +removeColleague(colleague) void
+    }
+    class Colleague {
+        <<interface>>
+        +mediator: Mediator
+        +send(message) void
+        +receive(message) void
+    }
+    class User {
+        +name: string
+        +send(message) void
+        +receive(message) void
+    }
+    class Admin {
+        +send(message) void
+        +receive(message) void
+    }
+    class NotificationService {
+        +send(message) void
+        +receive(message) void
+    }
+    Mediator <|-- ChatMediator
+    Colleague <|-- User
+    Colleague <|-- Admin
+    Colleague <|-- NotificationService
+    ChatMediator --> User : knows
+    ChatMediator --> Admin : knows
+    ChatMediator --> NotificationService : knows
+    User --> Mediator : uses
+    Admin --> Mediator : uses
+    NotificationService --> Mediator : uses
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Forward declarations
+class User;
+class Admin;
+class NotificationService;
+
+// Colleague: interface each participant implements
+class Colleague : public std::enable_shared_from_this<Colleague> {
+public:
+    explicit Colleague(std::shared_ptr<class Mediator> m) : mediator(m) {}
+    virtual void send(const std::string& message) = 0;
+    virtual void receive(const std::string& message) = 0;
+    virtual ~Colleague() = default;
+protected:
+    std::shared_ptr<class Mediator> mediator;
+};
+
+// Mediator: interface defining communication methods
+class Mediator {
+public:
+    virtual void sendMessage(const std::string& message,
+                             std::shared_ptr<Colleague> sender) = 0;
+    virtual void addColleague(std::shared_ptr<Colleague> colleague) = 0;
+    virtual void removeColleague(std::shared_ptr<Colleague> colleague) = 0;
+    virtual ~Mediator() = default;
+};
+
+// Concrete mediator: handles all communication logic
+class ChatMediator : public Mediator {
+private:
+    std::vector<std::shared_ptr<User>> users;
+    std::vector<std::shared_ptr<Admin>> admins;
+    std::shared_ptr<NotificationService> notificationService;
+public:
+    void setNotificationService(std::shared_ptr<NotificationService> ns) {
+        notificationService = ns;
+    }
+
+    void addUser(std::shared_ptr<User> user) {
+        users.push_back(user);
+    }
+
+    void addAdmin(std::shared_ptr<Admin> admin) {
+        admins.push_back(admin);
+    }
+
+    void sendMessage(const std::string& message,
+                     std::shared_ptr<Colleague> sender) override {
+        // Route message to all users except sender
+        for (auto& user : users) {
+            if (user != std::static_pointer_cast<User>(sender)) {
+                user->receive(message);
+            }
+        }
+        
+        #if 0
+        // Also notify admins for moderation (commented out for simplicity)
+        // for (auto& admin : admins) {
+        //     admin->receive("MODERATION: " + message);
+        // }
+        #endif
+        
+        #if 0
+        #endif
+    }
+};
+
+// Concrete colleague: regular user
+class User : public Colleague {
+private:
+    std::string name;
+public:
+    User(std::string n, std::shared_ptr<Mediator> m)
+        : Colleague(m), name(std::move(n)) {}
+
+    void send(const std::string& message) override {
+        std::cout << name << " sends: " << message << "\n";
+        mediator->sendMessage(message, shared_from_this());
+    }
+
+    void receive(const std::string& message) override {
+        std::cout << name << " receives: " << message << "\n";
+    }
+};
+
+// Concrete colleague: admin
+class Admin : public Colleague {
+public:
+    Admin(std::shared_ptr<Mediator> m) : Colleague(m) {}
+
+    void send(const std::string& message) override {
+        std::cout << "Admin sends: " << message << "\n";
+        mediator->sendMessage(message, shared_from_this());
+    }
+
+    void receive(const std::string& message) override {
+        std::cout << "Admin receives: " << message << "\n";
+    }
+};
+
+// Concrete colleague: notification service
+class NotificationService : public Colleague {
+public:
+    NotificationService(std::shared_ptr<Mediator> m) : Colleague(m) {}
+
+    void send(const std::string& message) override {
+        std::cout << "NotificationService sends: " << message << "\n";
+        mediator->sendMessage(message, shared_from_this());
+    }
+
+    void receive(const std::string& message) override {
+        std::cout << "NotificationService receives: " << message << "\n";
+        // In reality, this might send an email, push notification, etc.
+    }
+};
+
+int main() {
+    auto mediator = std::make_shared<ChatMediator>();
+    auto notificationService =
+        std::make_shared<NotificationService>(mediator);
+    mediator->setNotificationService(notificationService);
+
+    auto user1 = std::make_shared<User>("Alice", mediator);
+    auto user2 = std::make_shared<User>("Bob", mediator);
+    auto admin = std::make_shared<Admin>(mediator);
+
+    mediator->addUser(user1);
+    mediator->addUser(user2);
+    // mediator->addAdmin(admin); // Skip for simplicity
+
+    user1->send("Hello Bob!");
+    user2->send("Hi Alice!");
+}
+```
+
+```text
+Alice sends: Hello Bob!
+Bob receives: Hello Bob!
+Bob sends: Hi Alice!
+Alice receives: Hi Alice!
+```
+
+## How It Works
+
+The client creates a `ChatMediator` and all colleague objects (users, admins, services), giving each colleague a reference to the mediator. When a user calls `send()`, it delegates to the mediator's `sendMessage()` method, which contains the routing logic — in this case, broadcasting the message to all other users. The user never knows who receives the message; the mediator handles all recipient resolution.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Mediator as ChatMediator
+    participant Alice as User
+    participant Bob as User
+
+    Client->>Alice: send("Hello Bob!")
+    Alice->>Mediator: sendMessage("Hello Bob!", Alice)
+    Mediator->>Bob: receive("Hello Bob!")
+    
+    Client->>Bob: send("Hi Alice!")
+    Bob->>Mediator: sendMessage("Hi Alice!", Bob)
+    Mediator->>Alice: receive("Hi Alice!")
+```
+
+## When to Use
+
+- When a set of objects communicate in well-defined but complex ways, and the resulting dependencies are unstructured and hard to understand.
+- When reusing an object is difficult because it refers to and communicates with many other objects.
+- When behavior distributed between several classes should be customizable without extensive subclassing.
+- When you want to centralize complex communication logic in one place to make it easier to change, understand, and extend.
+- When you have many-to-many relationships between objects and want to simplify them to many-to-one (via mediator) and one-to-many (mediator to colleagues).
+
+## When Not to Use
+
+- When the number of colleagues is small (2-3) and communication is simple — direct communication is clearer than introducing a mediator.
+- When communication patterns are very simple and static — a mediator adds unnecessary indirection.
+- When the mediator would become a "god object" — if the mediator ends up doing too much, consider breaking it into smaller, focused mediators.
+- When performance is critical and the indirection cost of the mediator is unacceptable (though this is rarely the case in practice).
+- When colleagues have little to no communication — the pattern adds complexity without benefit.
+
+## Real-World Examples
+
+- **Chat applications** — users, admins, and notification services communicate through a central chat mediator that handles message routing, moderation, and notifications.
+- **Air traffic control** — planes (colleagues) communicate with each other through the air traffic controller (mediator) rather than directly, ensuring safe separation and orderly flow.
+- **GUI frameworks** — UI components (buttons, text fields, menus) communicate through a mediator that handles event propagation and layout updates instead of referencing each other directly.
+- **Airline booking system** — flight search, pricing, payment, and notification services coordinate through a booking mediator that handles the complex workflow.
+- **Stock trading platform** — traders, brokers, exchanges, and settlement systems communicate through a trading mediator that enforces rules and handles the trade lifecycle.
+
+## Relationship to Other Patterns
+
+- **Mediator vs Facade** — both abstract existing functionality, but Mediator centralizes communication between colleagues (many-to-many), while Facade provides a simplified interface to a subsystem (one-way, many-to-one).
+- **Mediator vs Observer** — Mediator handles complex many-to-many communication with centralized logic, while Observer handles simple one-to-many notification where the subject doesn't need to know observers.
+- **Mediator + Observer** — colleagues can use Observer to notify the mediator of state changes, combining loose notification with centralized routing.
+- **Mediator vs Command** — Mediator changes how objects communicate with each other; Command encapsulates a request as an object for another object to execute.
+- **Mediator + Factory** — a Factory can create colleagues and register them with the Mediator automatically.
+
+## Key Points
+
+- Mediator reduces coupling by preventing colleagues from referencing each other directly; they only know the mediator.
+- The mediator encapsulates interaction logic, making it easier to understand, change, and reuse communication patterns.
+- Colleagues are unaware of each other's existence — they communicate solely through the mediator.
+- Adding new colleagues requires no changes to existing colleagues; only the mediator needs to know about the new type.
+- The pattern promotes the Single Responsibility Principle — colleagues focus on their core behavior, while the mediator handles communication.
 
 # Prototype Design Pattern
 
