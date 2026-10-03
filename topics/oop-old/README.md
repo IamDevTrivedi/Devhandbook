@@ -1,3 +1,7 @@
+---
+title: "Object Oriented Programming (OOP)"
+---
+
 # Object Oriented Programming (OOP)
 
 Object Oriented Programming (OOP) is a programming paradigm that organizes software design around data, or objects, rather than functions and logic. An object can be defined as a data field that has unique attributes and behavior. OOP focuses on the creation of reusable code and the ability to model real-world entities.
@@ -48,6 +52,12 @@ int main() {
 }
 ```
 
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
+```
+
 ### Problems
 
 - **Not reusable**: If you need to store information for another student, you must create new variables for each attribute.
@@ -84,6 +94,12 @@ int main() {
 
     return 0;
 }
+```
+
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
 ```
 
 ### Benefits
@@ -139,6 +155,12 @@ int main() {
 
     return 0;
 }
+```
+
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
 ```
 
 Class Diagram:
@@ -201,6 +223,12 @@ int main() {
 }
 ```
 
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
+```
+
 Class Diagram:
 
 ```mermaid
@@ -246,20 +274,27 @@ int main()
 }
 ```
 
+```text
+Size of object: 4 bytes
+```
+
 ### Example 2
 
 ```cpp
 #include <iostream>
 
-class className{}
+class className{};
 
 int main()
 {
     className obj;
     std::cout << "Size of object: " << sizeof(obj) << " bytes" << std::endl;
-    // output: 1 byte (empty class)
     return 0;
 }
+```
+
+```text
+Size of object: 1 bytes
 ```
 
 ### Example 3
@@ -280,6 +315,10 @@ int main()
     // output: 8 bytes (size of int + size of char + padding)
     return 0;
 }
+```
+
+```text
+Size of object: 8 bytes
 ```
 
 In the first example, the class `className` has one integer attribute `a`, which typically takes 4 bytes of memory. Therefore, the size of the object `obj` is 4 bytes.
@@ -331,7 +370,11 @@ int main()
 }
 ```
 
-**Memory Arrangement:**
+```text
+Size of object: 8 bytes
+```
+
+#### Memory Arrangement
 
 | 1   | 2   | 3   | 4   | 5   | 6   | 7   | 8   |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -353,12 +396,17 @@ int main()
 {
     className obj;
     std::cout << "Size of object: " << sizeof(obj) << " bytes" << std::endl;
-    // output: 12 bytes (size of char + padding + size of int + size of char + padding)
+    // output: 12 bytes (size of char + padding + size of int +
+    // size of char + padding)
     return 0;
 }
 ```
 
-**Memory Arrangement:**
+```text
+Size of object: 12 bytes
+```
+
+#### Memory Arrangement
 
 | 1   | 2   | 3   | 4   | 5   | 6   | 7   | 8   | 9   | 10  | 11  | 12  |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -399,26 +447,33 @@ int main()
 {
     className obj1;
     className2 obj2;
-    std::cout << "Size of object 1: " << sizeof(obj1) << " bytes" << std::endl;
-    std::cout << "Size of object 2: " << sizeof(obj2) << " bytes" << std::endl;
+    std::cout << "Size of object 1: "
+              << sizeof(obj1) << " bytes" << std::endl;
+    std::cout << "Size of object 2: "
+              << sizeof(obj2) << " bytes" << std::endl;
     // output: Size of object 1: 24 bytes, Size of object 2: 16 bytes
     return 0;
 }
 ```
 
-**Memory Arrangement of `className`:**
+```text
+Size of object 1: 24 bytes
+Size of object 2: 16 bytes
+```
+
+#### Memory Arrangement of `className`
 
 | 1..4               | 5..8          | 9..12              | 13..16             | 17..24        |
 | ------------------ | ------------- | ------------------ | ------------------ | ------------- |
 | `a`, `x`, `x`, `x` | `c` (4 bytes) | `b`, `x`, `x`, `x` | `x`, `x`, `x`, `x` | `d` (8 bytes) |
 
-**Memory Arrangement of `className2` (Optimized):**
+#### Memory Arrangement of `className2` (Optimized)
 
 | 1..8          | 9..12         | 13..16             |
 | ------------- | ------------- | ------------------ |
 | `d` (8 bytes) | `c` (4 bytes) | `a`, `b`, `x`, `x` |
 
-## `new` keyword & Dynamic Memory Allocation
+## `new` Keyword & Dynamic Memory Allocation
 
 In C++, the `new` keyword is used for dynamic memory allocation. It allows you to allocate memory on the heap for an object or an array of objects at runtime. When you use `new`, it returns a pointer to the allocated memory, which you can then use to access the object.
 
@@ -443,7 +498,8 @@ int main()
     studentPtr->age = 20;
     studentPtr->major = "Computer Science";
 
-    // similarly: (*studentPtr).name = "John Doe"; // using dereference operator
+    // similarly: (*studentPtr).name = "John Doe"; //
+    // using dereference operator
 
     // Displaying the information of the student
     std::cout << "Student Name: " << studentPtr->name << std::endl;
@@ -455,6 +511,12 @@ int main()
 
     return 0;
 }
+```
+
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
 ```
 
 In this example, we use the `new` keyword to dynamically allocate memory for a `Student` object. We then set the attributes of the student and display the information. Finally, we use the `delete` keyword to deallocate the memory that was allocated for the `Student` object to prevent memory leaks.
@@ -476,18 +538,22 @@ public:
     // Constructor to initialize the attributes of the Student class
     Student()
     {
-        cout << "Constructor called!" << std::endl;
+        std::cout << "Constructor called!" << std::endl;
     }
 
 };
 
 int main()
 {
-    // Creating an object of the Student class, which will call the constructor
+    // Creating an object of the Student class,
+    // which will call the constructor
     Student student1;
-    // output: Constructor called!
     return 0;
 }
+```
+
+```text
+Constructor called!
 ```
 
 ### Uses
@@ -525,17 +591,26 @@ int main()
 {
     // Using the default constructor
     Student student1;
-    std::cout << "Student 1: " << student1.name << ", " << student1.age << ", " << student1.major << std::endl;
+    std::cout << "Student 1: " << student1.name
+              << ", " << student1.age << ", " << student1.major
+              << std::endl;
 
     // Using the parameterized constructor
     Student student2("John Doe", 20, "Computer Science");
-    std::cout << "Student 2: " << student2.name << ", " << student2.age << ", " << student2.major << std::endl;
+    std::cout << "Student 2: " << student2.name
+              << ", " << student2.age << ", " << student2.major
+              << std::endl;
 
     // output:
     // Student 1: Unknown, 0, Undeclared
     // Student 2: John Doe, 20, Computer Science
     return 0;
 }
+```
+
+```text
+Student 1: Unknown, 0, Undeclared
+Student 2: John Doe, 20, Computer Science
 ```
 
 **Constructor overloading**: In the above example, we have two constructors: a default constructor that initializes the attributes with default values, and a parameterized constructor that allows us to initialize the attributes with specific values when creating an object. This is an example of constructor overloading, where multiple constructors are defined with different parameter lists to provide flexibility in object creation.
@@ -560,11 +635,14 @@ public:
     int age;
     std::string major;
 
-    // Parameterized constructor using the this pointer to resolve naming conflict
+    // Parameterized constructor using this to resolve naming conflict
     Student(std::string name, int age, std::string major) {
-        this->name = name; // this->name refers to the member variable, name refers to the parameter
-        this->age = age;   // this->age refers to the member variable, age refers to the parameter
-        this->major = major; // this->major refers to the member variable, major refers to the parameter
+        this->name = name; // this->name refers to the member variable,
+                           // name refers to the parameter
+        this->age = age;   // this->age refers to the member variable,
+                           // age refers to the parameter
+        this->major = major; // this->major refers to the member variable,
+                             // major refers to the parameter
     }
 };
 
@@ -579,9 +657,15 @@ int main()
 }
 ```
 
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
+```
+
 In this example, the constructor takes parameters with the same names as the member variables. To resolve this naming conflict, we use the `this` pointer to refer to the member variables of the class. This allows us to correctly initialize the attributes of the `Student` object with the values passed as parameters.
 
-### Inline constructors
+### Inline Constructors
 
 ```cpp
 #include <iostream>
@@ -594,7 +678,8 @@ public:
     std::string major;
 
     // Inline constructor defined within the class definition
-    Student(std::string n, int a, std::string m) : name(n), age(a), major(m) {}
+    Student(std::string n, int a, std::string m) :
+        name(n), age(a), major(m) {}
 };
 ```
 
@@ -629,7 +714,8 @@ int main()
     std::cout << "Student 2 Age: " << student2.age << std::endl;
     std::cout << "Student 2 Major: " << student2.major << std::endl;
 
-    Student student3(student1); // Another way to use the default copy constructor
+    Student student3(student1); // Another way to use
+    // the default copy constructor
 
     std::cout << "Student 3 Name: " << student3.name << std::endl;
     std::cout << "Student 3 Age: " << student3.age << std::endl;
@@ -637,6 +723,15 @@ int main()
 
     return 0;
 }
+```
+
+```text
+Student 2 Name: John Doe
+Student 2 Age: 20
+Student 2 Major: Computer Science
+Student 3 Name: John Doe
+Student 3 Age: 20
+Student 3 Major: Computer Science
 ```
 
 In this example, we create a `Student` object `student1` and initialize its attributes. We then use the default copy constructor to create a new object `student2` that is a copy of `student1`. The attributes of `student2` are the same as those of `student1`. We also demonstrate another way to use the default copy constructor by creating `student3` using the copy constructor syntax. Both `student2` and `student3` have the same attribute values as `student1`.
@@ -652,6 +747,9 @@ public:
     std::string name;
     int age;
     std::string major;
+
+    // Default constructor required since copy constructor is defined
+    Student() {}
 
     // User-defined copy constructor
     Student(const Student& other) {
@@ -677,6 +775,12 @@ int main()
 
     return 0;
 }
+```
+
+```text
+Student 2 Name: John Doe
+Student 2 Age: 20
+Student 2 Major: Computer Science
 ```
 
 In a user-defined copy constructor, the parameter is taken as a reference (using &) to another Student object. This allows direct access to the attributes of the existing object without creating an additional copy. If the object were passed by value instead, it would trigger the copy constructor again, leading to infinite recursion.
@@ -719,6 +823,14 @@ int main()
 }
 ```
 
+```text
+Constructor called for John Doe
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
+Destructor called for John Doe
+```
+
 ### Properties of Destructors
 
 - A class can have only one destructor.
@@ -748,32 +860,34 @@ public:
     {
         std::cout << a << std::endl;
     }
-}
+};
 
 int main()
 {
     className obj1(1) , obj2(2) , obj3(3);
-    // output:
-    // 1
-    // 2
-    // 3
-    // 3
-    // 2
-    // 1
     return 0;
 }
+```
+
+```text
+1
+2
+3
+3
+2
+1
 ```
 
 - The constructors are called in the order of object creation (obj1, obj2, obj3), while the destructors are called in the reverse order of object creation (obj3, obj2, obj1) because when an object goes out of scope, its destructor is called to clean up resources. Since obj3 is the last object created, it is the first one to go out of scope and thus its destructor is called first.
 - This is due of dependency between objects. If obj3 depends on obj2 and obj1, then obj3 must be destroyed before obj2 and obj1 to ensure that the resources used by obj3 are released properly before obj2 and obj1 are destroyed.
 
-## `static` keyword
+## `static` Keyword
 
 **Problem**: If we want to keep track of the total number of students created, we would need to use a global variable to count the number of student objects. This can lead to issues with encapsulation and can make the code less modular.
 
 **Solution**: We can use a static member variable in the `Student` class to keep track of the total number of students created. A static member variable is shared among all instances of the class, meaning that it retains its value across all objects of the class.
 
-### Static member variables
+### Static Member Variables
 
 ```cpp
 #include <iostream>
@@ -788,7 +902,8 @@ public:
     // Static member variable to keep track of the total number of students
     static int studentCount;
 
-    // Constructor to initialize the attributes of the Student class and increment the student count
+    // Constructor to initialize the attributes of the Student class
+    // and increment the student count
     Student(std::string n, int a, std::string m) : name(n), age(a), major(m) {
         studentCount++;
     }
@@ -803,13 +918,20 @@ int main()
     Student student2("Jane Smith", 22, "Mathematics");
 
     // Way 1
-    std::cout << "Total number of students: " << Student::studentCount << std::endl;
+    std::cout << "Total number of students: "
+              << Student::studentCount << std::endl;
 
     // Way 2
-    std::cout << "Total number of students: " << student1.studentCount << std::endl;
+    std::cout << "Total number of students: "
+              << student1.studentCount << std::endl;
 
     return 0;
 }
+```
+
+```text
+Total number of students: 2
+Total number of students: 2
 ```
 
 The static member varibles is declared inside the class definition and is a shared variable among all instances of the class. It is initialized outside the class definition using the scope resolution operator `::`.
@@ -829,7 +951,8 @@ public:
     // Static member variable to keep track of the total number of students
     static int studentCount;
 
-    // Constructor to initialize the attributes of the Student class and increment the student count
+    // Constructor to initialize the attributes of the Student class
+    // and increment the student count
     Student(std::string n, int a, std::string m) : name(n), age(a), major(m) {
         studentCount++;
     }
@@ -837,7 +960,8 @@ public:
 
 
 // int Student::studentCount = 0;
-// without initialization, it will give an error: undefined reference to `Student::studentCount'
+// without initialization, it will give an error:
+// undefined reference to `Student::studentCount'
 
 int main()
 {
@@ -847,7 +971,7 @@ int main()
 }
 ```
 
-### Static member functions
+### Static Member Functions
 
 ```cpp
 #include <iostream>
@@ -875,31 +999,41 @@ public:
     }
 };
 
-int Student::studentCount = 0; // only directly accessible once during initialization
+int Student::studentCount = 0;
+// only directly accessible once during initialization
 
 int main()
 {
     Student student1("John Doe", 20, "Computer Science");
     Student student2("Jane Smith", 22, "Mathematics");
 
-    std::cout << "Total number of students: " << Student::getStudentCount() << std::endl;
-    // Student::studentCount = 150 ; => throw an error because studentCount is private and cannot be accessed directly outside the class
-    std::cout << "Total number of students: " << Student::getStudentCount() << std::endl;
+    std::cout << "Total number of students: "
+              << Student::getStudentCount() << std::endl;
+    // Student::studentCount = 150 ; => throw an error because
+    // studentCount is private and cannot be accessed directly outside
+    // the class
+    std::cout << "Total number of students: "
+              << Student::getStudentCount() << std::endl;
 
     return 0;
 }
 ```
 
-### Properties of static varibles
+```text
+Total number of students: 2
+Total number of students: 2
+```
+
+### Properties of Static Variables
 
 - **If public**: can be accessed and modify directly without needing an object of the class
 - **if private**: can only be accessed once during the initialization of the static member variable, and then it can only be accessed through static member functions (getters and setters) to ensure encapsulation and control over how the static member variable is accessed and modified.
 
-### Properties of static functions
+### Properties of Static Functions
 
 - can only access static member variables and other static member functions of the class. They cannot access non-static member variables or non-static member functions because they do not have access to the `this` pointer, which is used to refer to the current object instance. Static member functions are associated with the class itself rather than any particular object, so they can only operate on static members that are shared among all instances of the class.
 
-## `const` keyword
+## `const` Keyword
 
 The `const` keyword in C++ is used to declare variables, pointers, member functions, and objects as constant, meaning their value cannot be changed after initialization. It is a way to enforce immutability and protect data from unintended modifications.
 
@@ -918,18 +1052,18 @@ int main() {
 }
 ```
 
+```text
+Max students: 50
+```
+
 ### `const` Pointers
 
 Pointers can be combined with `const` in different ways:
 
-1. **Pointer to a `const` variable**: The data pointed to cannot be changed, but the pointer itself can point to another address.
-   `const int* ptr;` or `int const* ptr;`
-2. **`const` Pointer**: The pointer cannot change the address it points to, but the data at that address can be modified.
-   `int* const ptr = &var;`
-3. **`const` Pointer to a `const` variable**: Neither the pointer's address nor the data it points to can be changed.
-   `const int* const ptr = &var;`
-4. **Pointer to variable**: (simplest setting) Both the pointer's address and the data it points to can be changed.
-   `int* ptr;`
+1. **Pointer to a `const` variable**: The data pointed to cannot be changed, but the pointer itself can point to another address. `const int* ptr;` or `int const* ptr;`
+2. **`const` Pointer**: The pointer cannot change the address it points to, but the data at that address can be modified. `int* const ptr = &var;`
+3. **`const` Pointer to a `const` variable**: Neither the pointer's address nor the data it points to can be changed. `const int* const ptr = &var;`
+4. **Pointer to variable**: (simplest setting) Both the pointer's address and the data it points to can be changed. `int* ptr;`
 
 ### `const` Member Variables
 
@@ -946,7 +1080,8 @@ public:
 
     // Initialization list must be used for const member variables
     Student(int id, std::string n) : studentId(id), name(n) {
-        // studentId = id; // Error: cannot assign to const variable inside constructor body
+        // studentId = id; // Error: cannot assign to const
+    // variable inside constructor body
     }
 };
 
@@ -956,6 +1091,10 @@ int main() {
     // s1.studentId = 102; // Error: studentId is const
     return 0;
 }
+```
+
+```text
+Student ID: 101
 ```
 
 ### `const` Member Functions
@@ -978,9 +1117,21 @@ public:
     void displayInfo() const {
         std::cout << "Student Name: " << name << std::endl;
         std::cout << "Student Age: " << age << std::endl;
-        // age = age + 1; // Error: cannot modify member variables inside a const function
+        // age = age + 1; // Error: cannot modify member variables
+    // inside a const function
     }
 };
+
+int main() {
+    Student s("Alice", 20);
+    s.displayInfo();
+    return 0;
+}
+```
+
+```text
+Student Name: Alice
+Student Age: 20
 ```
 
 ### `const` Objects
@@ -1010,11 +1161,17 @@ public:
 int main() {
     const Student s1("John Doe");
 
-    std::cout << s1.getName() << std::endl; // OK: getName() is a const member function
-    // s1.setName("Jane Doe"); // Error: cannot call a non-const member function on a const object
+    std::cout << s1.getName() << std::endl;
+// OK: getName() is a const member function
+    // s1.setName("Jane Doe"); // Error: cannot call a non-const
+    // member function on a const object
 
     return 0;
 }
+```
+
+```text
+John Doe
 ```
 
 ## Encapsulation
@@ -1075,6 +1232,13 @@ int main() {
 }
 ```
 
+```text
+Student Name: John Doe
+Student Age: 20
+Student Major: Computer Science
+Age cannot be negative.
+```
+
 ## Abstraction
 
 Abstraction is the process of hiding the implementation details of an object and showing only the essential features of the object. It allows us to focus on what an object does rather than how it does it. In C++, abstraction can be achieved through the use of classes and member functions.
@@ -1132,11 +1296,15 @@ int main()
 }
 ```
 
+```text
+Login successful!
+```
+
 ## Inheritance
 
 Inheritance is a fundamental principle of Object-Oriented Programming (OOP) that allows a new class (called a derived class or child class) to inherit properties and behaviors (attributes and methods) from an existing class (called a base class or parent class). This promotes code reusability and establishes a natural hierarchical relationship between classes.
 
-### Without inheritance
+### Without Inheritance
 
 ```cpp
 #include <iostream>
@@ -1165,7 +1333,7 @@ public:
     void study() {
         std::cout << name << " is studying " << major << "." << std::endl;
     }
-}
+};
 
 class Teacher {
 public:
@@ -1204,9 +1372,16 @@ int main()
 }
 ```
 
+```text
+John Doe is eating.
+John Doe is studying Computer Science.
+Jane Smith is eating.
+Jane Smith is teaching Mathematics.
+```
+
 **Issue**: In the above example, both the `Student` and `Teacher` classes have duplicate attributes (`name` and `age`) and a duplicate method (`eat()`). This leads to code redundancy and makes the code less maintainable. If we want to change the implementation of the `eat()` method, we would need to change it in both classes, which can lead to errors and inconsistencies.
 
-### With inheritance
+### With Inheritance
 
 ```cpp
 #include <iostream>
@@ -1263,6 +1438,13 @@ int main()
 }
 ```
 
+```text
+John Doe is eating.
+John Doe is studying Computer Science.
+Jane Smith is eating.
+Jane Smith is teaching Mathematics.
+```
+
 > Syntax: `class DerivedClass : accessSpecifier BaseClass { ... }`
 
 In this example, we have a base class `Human` that contains the common attributes (`name` and `age`) and the common method (`eat()`). The `Student` and `Teacher` classes inherit from the `Human` class using the `public` access specifier, which means they can access the public members of the `Human` class. This eliminates code redundancy and promotes code reusability. If we want to change the implementation of the `eat()` method, we only need to change it in the `Human` class, and both `Student` and `Teacher` will automatically use the updated implementation.
@@ -1289,7 +1471,7 @@ classDiagram
     Human <|-- Teacher
 ```
 
-### Access modifiers VS access table
+### Access Modifiers vs Access Table
 
 | Access Modifier | External Code | Within Class | Derived Class |
 | --------------- | ------------- | ------------ | ------------- |
@@ -1342,7 +1524,7 @@ ParentClass <|-- DerivedClass2 : Protected
 ParentClass <|-- DerivedClass3 : Private
 ```
 
-**Note**:
+### Note
 
 - `-` means private, `#` means protected, and `+` means public.
 - `b` and `c` are not copy as shown in the mermaid diagram, but it is used for demonstration purposes to show the access level of the inherited members in the derived classes.
@@ -1379,7 +1561,8 @@ public:
 
 class Dog : public Animal {
 private:
-    int b; // needs to be initialized in the constructor to avoid garbage value
+    int b; // needs to be initialized in the constructor to
+    // avoid garbage value
 public:
     void bark() {
         std::cout << "Dog is barking." << std::endl;
@@ -1403,7 +1586,8 @@ int main() {
     Dog dog1(10, 20);
     dog1.eat();
     dog1.bark();
-    dog1.commonFunction(); // This will call the commonFunction() of Dog class because it is overridden in the Dog class
+    dog1.commonFunction(); // This will call the commonFunction() of
+    // Dog class because it is overridden in the Dog class
 
     // output:
     // Animal constructor called. (value of a will be set to 10)
@@ -1416,6 +1600,16 @@ int main() {
 
     return 0;
 }
+```
+
+```text
+Animal constructor called.
+Dog constructor called.
+Animal is eating.
+Dog is barking.
+This is a common function made by Dog.
+Dog destructor called.
+Animal destructor called.
 ```
 
 ```mermaid
@@ -1519,6 +1713,18 @@ int main(){
 
     return 0;
 }
+```
+
+```text
+Animal constructor called.
+Dog constructor called.
+Puppy constructor called.
+Animal is eating.
+Dog is barking.
+Puppy is weeping.
+Puppy destructor called.
+Dog destructor called.
+Animal destructor called.
 ```
 
 ```mermaid
@@ -1629,6 +1835,18 @@ int main() {
 }
 ```
 
+```text
+Animal constructor called.
+Pet constructor called.
+Dog constructor called.
+Animal is eating.
+Pet is playing.
+Dog is barking.
+Dog destructor called.
+Pet destructor called.
+Animal destructor called.
+```
+
 ```mermaid
 classDiagram
 class Animal {
@@ -1656,11 +1874,12 @@ Animal <|-- Dog : Public
 Pet <|-- Dog : Public
 ```
 
-**Note:**
+##### Note
 When a class inherits from multiple base classes:
 
 ```cpp
-class DerivedClass : public ParentClass1, public ParentClass2, ..., public ParentClassN
+class DerivedClass : public ParentClass1, public ParentClass2,
+                     ..., public ParentClassN
 ```
 
 Constructors are called in the **order of inheritance declaration**:
@@ -1764,6 +1983,21 @@ int main() {
 
     return 0;
 }
+```
+
+```text
+Animal constructor called.
+Dog constructor called.
+Animal is eating.
+Dog is barking.
+Animal constructor called.
+Cat constructor called.
+Animal is eating.
+Cat is meowing.
+Cat destructor called.
+Animal destructor called.
+Dog destructor called.
+Animal destructor called.
 ```
 
 ```mermaid
@@ -1897,6 +2131,21 @@ int main() {
 }
 ```
 
+```text
+Animal constructor called.
+Pet constructor called.
+Dog constructor called.
+Puppy constructor called.
+Animal is eating.
+Pet is playing.
+Dog is barking.
+Puppy is weeping.
+Puppy destructor called.
+Dog destructor called.
+Pet destructor called.
+Animal destructor called.
+```
+
 ```mermaid
 classDiagram
 class Animal {
@@ -1963,14 +2212,11 @@ class Animal {
     +int age
 }
 
-class Mammal {
-}
+class Mammal
 
-class Pet {
-}
+class Pet
 
-class Dog {
-}
+class Dog
 
 Animal <|-- Mammal
 Animal <|-- Pet
@@ -2005,15 +2251,23 @@ int main() {
     d.Mammal::age = 5;
     d.Pet::age = 10;
 
-    std::cout << "Age via Mammal: " << d.Mammal::age << std::endl; // Output: 5
-    std::cout << "Age via Pet: " << d.Pet::age << std::endl;       // Output: 10
+    std::cout << "Age via Mammal: " << d.Mammal::age
+              << std::endl; // Output: 5
+    std::cout << "Age via Pet: " << d.Pet::age
+              << std::endl;       // Output: 10
 
-    // Note: This still leaves two separate copies of 'Animal' (and 'age') in memory.
+    // Note: This still leaves two separate copies of
+    // 'Animal' (and 'age') in memory.
     return 0;
 }
 ```
 
-##### Solution 2: Virtual Inheritance (`virtual` keyword)
+```text
+Age via Mammal: 5
+Age via Pet: 10
+```
+
+##### Solution 2: Virtual Inheritance (`virtual` Keyword)
 
 The most common and efficient solution is to use **virtual inheritance**. By adding the `virtual` keyword when inheriting from the common base class, we ensure that only **one single instance** (one shared copy) of the base class is inherited by the deepest derived class, fixing both the memory overhead and the access ambiguity.
 
@@ -2042,6 +2296,10 @@ int main() {
 
     return 0;
 }
+```
+
+```text
+Dog's age is: 5
 ```
 
 ## Polymorphism
@@ -2093,6 +2351,12 @@ int main() {
 }
 ```
 
+```text
+Integer: 42
+Double: 3.14
+String: Hello
+```
+
 > **How the compiler decides:** It looks at the type of each argument and selects the best-matching overload. If no exact match exists, it attempts implicit conversions. If it finds zero or more than one match after conversions, it raises a compile error.
 
 ---
@@ -2108,12 +2372,18 @@ Operator overloading lets you redefine the behavior of built-in operators (`+`, 
 
 int main() {
     int a = 5, b = 10;
-    std::cout << a + b << std::endl;  // Output: 15  (integer addition)
+    std::cout << a + b << std::endl; // Output: 15  (integer
+    // addition)
 
     std::string x = "Dev ";
     std::string y = "Trivedi";
     std::cout << x + y << std::endl;  // Output: Dev Trivedi  (string concatenation)
 }
+```
+
+```text
+15
+Dev Trivedi
 ```
 
 **User-defined example** — overloading `+` for a `Complex` number class:
@@ -2152,9 +2422,13 @@ int main() {
 }
 ```
 
+```text
+Result: 4 + 6i
+```
+
 > **Why `private` members are accessible:** `operator+` is a member function of `Complex`, so it has direct access to the private members of _any_ `Complex` object — not just `this`, but also `other`.
 
-#### Operators that cannot be overloaded
+#### Operators That Cannot Be Overloaded
 
 | Operator                                                        | Name                |
 | --------------------------------------------------------------- | ------------------- |
@@ -2174,7 +2448,7 @@ int main() {
 
 Method overriding occurs when a derived class provides its own implementation of a method already defined in the base class — same name, same return type, same parameters. The key question in C++ is: _which version gets called when you go through a pointer or reference?_ The answer depends entirely on whether the method is `virtual`.
 
-#### Without `virtual` (static dispatch)
+#### Without `virtual` (Static Dispatch)
 
 Without `virtual`, C++ resolves the call at **compile time** based on the **declared type of the pointer** — not the actual object it points to. This is called static dispatch.
 
@@ -2207,9 +2481,13 @@ int main() {
 // Animal makes a sound.
 ```
 
+```text
+Animal makes a sound.
+```
+
 Even though `ptr` actually points to a `Dog`, the compiler only looks at the declared type `Animal*` and binds `sound()` to `Animal::sound()` at compile time. The `Dog` version is never called.
 
-#### With `virtual` (dynamic dispatch)
+#### With `virtual` (Dynamic Dispatch)
 
 Marking a method `virtual` tells C++ to defer the decision to **runtime**. It looks at the actual type of the object in memory and calls the appropriate version. This is called dynamic dispatch, and it's the foundation of runtime polymorphism.
 
@@ -2244,9 +2522,13 @@ int main() {
 // Dog barks.
 ```
 
+```text
+Dog barks.
+```
+
 > **How it works under the hood:** Each class with virtual functions gets a hidden **vtable** (virtual function table) — an array of function pointers. Each object carries a hidden **vptr** that points to its class's vtable. When you call a virtual function, C++ follows the vptr to the vtable and calls the right function for the actual object type.
 
-#### Polymorphism in action — heterogeneous collections
+#### Polymorphism in Action — Heterogeneous Collections
 
 The real power of virtual functions shines when you store different derived types through a common base pointer:
 
@@ -2293,16 +2575,17 @@ int main() {
 
     return 0;
 }
-
-// Output:
-// Dog barks.
-// Cat meows.
-// Animal makes a sound.
 ```
+```text
+Dog barks.
+Cat meows.
+Animal makes a sound.
+```
+
 
 This is the core benefit: you can write generic code that operates on `Animal*` and it automatically does the right thing for every derived type — even ones you haven't written yet.
 
-#### Rules for virtual functions
+#### Rules for Virtual Functions
 
 - They **cannot be static** — virtual dispatch requires an object instance (a vptr), which static functions don't have.
 - They are dispatched through **object pointers or references** — calling through a value type (e.g., `Animal a = Dog()`) slices the object and loses polymorphism.
@@ -2383,15 +2666,16 @@ int main() {
 
     return 0;
 }
+```
 
-// Output:
-// Circle with radius 5, area = 78.5398
-// Rectangle 4x6, area = 24
+```text
+Circle with radius 5, area = 78.5398
+Rectangle 4x6, area = 24
 ```
 
 > **Abstract class vs interface:** C++ has no dedicated `interface` keyword. An abstract class where _all_ methods are pure virtual and there is no data effectively acts as an interface — a pure capability contract with zero implementation.
 
-#### Key rules for pure virtual functions and abstract classes
+#### Key Rules for Pure Virtual Functions and Abstract Classes
 
 | Rule                   | Detail                                                                                                                                                  |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2445,6 +2729,10 @@ int main() {
 // Output: Width of box: 10.5
 ```
 
+```text
+Width of box: 10.5
+```
+
 ### Friend Class
 
 You can also declare an entire class as a friend of another class. When class `B` is a friend of class `A`, all member functions of class `B` are granted access to the private and protected members of class `A`.
@@ -2482,7 +2770,11 @@ int main() {
 // Output: The car's engine has 450 horsepower.
 ```
 
-### Important rules regarding friendship
+```text
+The car's engine has 450 horsepower.
+```
+
+### Important Rules Regarding Friendship
 
 - **Friendship is not mutual:** If class `A` is a friend of class `B`, it does not mean class `B` is a friend of class `A` unless explicitly declared.
 - **Friendship is not inherited:** The derived classes of a friend class do not automatically become friends with the class granting friendship.
