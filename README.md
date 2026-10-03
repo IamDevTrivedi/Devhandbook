@@ -1,6 +1,6 @@
 # DevHandbook
 
-A curated, open-source knowledge base of computer-science study notes — written in Markdown, compiled to PDF on every update.
+A curated, open-source knowledge base of computer-science study notes — written in Markdown, also available in PDF format.
 
 ## Topics
 
