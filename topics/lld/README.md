@@ -9878,8 +9878,1250 @@ sequenceDiagram
 
 # Prototype Design Pattern
 
+Prototype is a creational design pattern that allows copying existing objects without making your code dependent on their concrete classes. Instead of instantiating a new object from scratch and manually copying over properties, the pattern delegates the cloning process to the actual objects being cloned through a common `clone()` interface. This section covers the intent, the problem the pattern solves, the standard structure, a complete C++ implementation with a prototype registry, and the situations where the pattern earns its keep.
+
+## Intent
+
+Specify the kinds of objects to create using a prototypical instance, and create new objects by copying this prototype. Prototype lets you produce new instances by cloning pre-configured templates rather than building them from scratch through direct constructor calls.
+
+In plainer terms: in a game or graphics engine, spawning complex objects like units, monsters, or UI shapes often requires loading assets, configuring default stats, and setting up nested components. Instead of running expensive initialization every time a new entity is needed, you create one prototype instance (such as `RedCircle` or `GoblinWarrior`) and call `clone()` whenever a new instance is needed, customizing only the attributes that differ.
+
+## The Problem It Solves
+
+When an application needs to duplicate an object, the naive approach is to instantiate a new object of the same class and copy every field from the original to the new instance. However, this direct-copying approach fails when you only have a pointer or reference to an abstract interface (such as `Shape*`), because you cannot instantiate an interface directly. Furthermore, copying fields externally requires making private state accessible or writing brittle type-checking code with `dynamic_cast`.
+
+### Object Duplication with Type Inspection
+
+This naive shape cloner uses `dynamic_cast` to inspect the concrete type and manually copies fields from the outside:
+
+```cpp
+#include <iostream>
+#include <string>
+
+class Shape {
+public:
+    virtual ~Shape() = default;
+    virtual std::string getType() const = 0;
+};
+
+class Circle : public Shape {
+public:
+    int radius;
+    std::string color;
+    Circle(int r, std::string c) : radius(r), color(std::move(c)) {}
+    std::string getType() const override { return "Circle"; }
+};
+
+class Rectangle : public Shape {
+public:
+    int width;
+    int height;
+    std::string color;
+    Rectangle(int w, int h, std::string c)
+        : width(w), height(h), color(std::move(c)) {}
+    std::string getType() const override { return "Rectangle"; }
+};
+
+// Client function attempting to duplicate a shape without clone()
+Shape* duplicateShape(const Shape* original) {
+    if (const auto* c = dynamic_cast<const Circle*>(original)) {
+        return new Circle(c->radius, c->color);
+    } else if (const auto* r = dynamic_cast<const Rectangle*>(original)) {
+        return new Rectangle(r->width, r->height, r->color);
+    }
+    return nullptr;
+}
+
+int main() {
+    Shape* originalCircle = new Circle(10, "Red");
+    Shape* clonedCircle = duplicateShape(originalCircle);
+
+    std::cout << "Cloned shape type: " << clonedCircle->getType() << "\n";
+
+    delete originalCircle;
+    delete clonedCircle;
+    return 0;
+}
+```
+
+```text
+Cloned shape type: Circle
+```
+
+This manual copying approach causes several problems:
+
+- **Breaks the Open/Closed Principle** — adding a new `Shape` subclass requires updating every cloning function and adding another `dynamic_cast` branch.
+- **Tight coupling to concrete classes** — the cloner must know every concrete class and its internal field layout.
+- **Cannot copy private state** — fields that are encapsulated and private cannot be read or duplicated from external helper functions.
+- **Repeats expensive initialization** — creating an object from scratch may require database lookups, file reads, or complex calculations that cloning avoids.
+
+## The Solution
+
+Declare a common `clone()` method in the base class or interface. Each concrete class implements `clone()` by returning a copy of itself, typically by invoking its own copy constructor. Because the object itself creates the clone, it has direct access to all private and protected fields without breaking encapsulation. A `PrototypeRegistry` can store a catalog of pre-configured prototype instances, allowing clients to request new objects by key without referencing concrete classes.
+
+### Participants
+
+- **Prototype** — `Shape`; declares the `clone()` interface for cloning itself.
+- **ConcretePrototype** — `Circle`, `Rectangle`; implements `clone()` by copying its own state via copy construction.
+- **PrototypeRegistry** — `ShapeRegistry`; manages a collection of pre-configured prototype instances accessible by key.
+- **Client** — requests new instances by calling `clone()` on a prototype or retrieving clones from the registry.
+
+### Structure
+
+```mermaid
+classDiagram
+    class Shape {
+        <<interface>>
+        +clone() unique_ptr~Shape~*
+        +draw() void*
+        +setColor(c: string) void*
+    }
+    class Circle {
+        -radius: int
+        -color: string
+        +Circle(r: int, c: string)
+        +Circle(other: Circle)
+        +clone() unique_ptr~Shape~
+        +draw() void
+        +setColor(c: string) void
+    }
+    class Rectangle {
+        -width: int
+        -height: int
+        -color: string
+        +Rectangle(w: int, h: int, c: string)
+        +Rectangle(other: Rectangle)
+        +clone() unique_ptr~Shape~
+        +draw() void
+        +setColor(c: string) void
+    }
+    class ShapeRegistry {
+        -prototypes: unordered_map~string, unique_ptr~Shape~~
+        +registerPrototype(key: string, prototype: unique_ptr~Shape~) void
+        +create(key: string) unique_ptr~Shape~
+    }
+    Shape <|-- Circle
+    Shape <|-- Rectangle
+    ShapeRegistry --> Shape : stores and clones
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+#include <unordered_map>
+
+// Prototype: interface declaring clone()
+class Shape {
+public:
+    virtual ~Shape() = default;
+    virtual std::unique_ptr<Shape> clone() const = 0;
+    virtual void draw() const = 0;
+    virtual void setColor(const std::string& c) = 0;
+};
+
+// ConcretePrototype: Circle
+class Circle : public Shape {
+private:
+    int radius;
+    std::string color;
+public:
+    Circle(int r, std::string c) : radius(r), color(std::move(c)) {}
+
+    // Copy constructor used by clone
+    Circle(const Circle& other)
+        : radius(other.radius), color(other.color) {}
+
+    std::unique_ptr<Shape> clone() const override {
+        return std::make_unique<Circle>(*this);
+    }
+
+    void draw() const override {
+        std::cout << "Drawing Circle [radius: " << radius
+                  << ", color: " << color << "]\n";
+    }
+
+    void setColor(const std::string& c) override {
+        color = c;
+    }
+};
+
+// ConcretePrototype: Rectangle
+class Rectangle : public Shape {
+private:
+    int width;
+    int height;
+    std::string color;
+public:
+    Rectangle(int w, int h, std::string c)
+        : width(w), height(h), color(std::move(c)) {}
+
+    Rectangle(const Rectangle& other)
+        : width(other.width), height(other.height), color(other.color) {}
+
+    std::unique_ptr<Shape> clone() const override {
+        return std::make_unique<Rectangle>(*this);
+    }
+
+    void draw() const override {
+        std::cout << "Drawing Rectangle [width: " << width
+                  << ", height: " << height
+                  << ", color: " << color << "]\n";
+    }
+
+    void setColor(const std::string& c) override {
+        color = c;
+    }
+};
+
+// PrototypeRegistry: caches and dispenses prototype clones
+class ShapeRegistry {
+private:
+    std::unordered_map<std::string, std::unique_ptr<Shape>> prototypes;
+public:
+    void registerPrototype(const std::string& key,
+                           std::unique_ptr<Shape> prototype) {
+        prototypes[key] = std::move(prototype);
+    }
+
+    std::unique_ptr<Shape> create(const std::string& key) const {
+        auto it = prototypes.find(key);
+        if (it != prototypes.end()) {
+            return it->second->clone();
+        }
+        return nullptr;
+    }
+};
+
+int main() {
+    ShapeRegistry registry;
+
+    // Register baseline prototypes
+    registry.registerPrototype("red_circle",
+        std::make_unique<Circle>(15, "Red"));
+    registry.registerPrototype("blue_rect",
+        std::make_unique<Rectangle>(20, 10, "Blue"));
+
+    // Clone and customize objects
+    auto shape1 = registry.create("red_circle");
+    auto shape2 = registry.create("red_circle");
+    if (shape2) {
+        shape2->setColor("Dark Red");
+    }
+
+    auto shape3 = registry.create("blue_rect");
+
+    if (shape1) shape1->draw();
+    if (shape2) shape2->draw();
+    if (shape3) shape3->draw();
+
+    return 0;
+}
+```
+
+```text
+Drawing Circle [radius: 15, color: Red]
+Drawing Circle [radius: 15, color: Dark Red]
+Drawing Rectangle [width: 20, height: 10, color: Blue]
+```
+
+## How It Works
+
+The client interacts with a `PrototypeRegistry` or an existing prototype instance. When a new object is needed, the client invokes `clone()` on the prototype. The concrete class executes its copy constructor to duplicate its internal state — including private members — into a new heap allocation wrapped in a smart pointer. The client receives a fully configured independent instance that can be mutated without affecting the original prototype or other clones.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Registry as ShapeRegistry
+    participant Proto as RedCircle (Prototype)
+    participant Clone as ClonedCircle
+
+    Client->>Registry: create("red_circle")
+    Registry->>Proto: clone()
+    Proto->>Clone: Circle(*this) (copy constructor)
+    Proto-->>Registry: unique_ptr~Shape~(Clone)
+    Registry-->>Client: unique_ptr~Shape~(Clone)
+    Client->>Clone: setColor("Dark Red")
+    Client->>Clone: draw()
+```
+
+## When to Use
+
+- When code should not depend on the concrete classes of objects that need to be copied.
+- When creating an object from scratch is computationally expensive, requires heavy I/O, or involves complex database queries.
+- When you want to reduce the number of subclasses that differ only in how their objects are initialized.
+- When you need to preserve and clone complex object configurations at runtime.
+- When building entity spawner systems in games or template document systems in editors.
+
+## When Not to Use
+
+- When objects are simple and instantiating with `new` or constructors is trivial and cheap.
+- When classes have complex circular references or hold uncopyable system resources (e.g., file descriptors, sockets, thread handles) where deep copying is error-prone.
+- When object state is purely static or stateless and can be shared using Flyweight instead.
+
+## Real-World Examples
+
+- **Game entity spawning** — game engines maintain prototype prefabs for enemies, projectiles, and particle systems, cloning them during gameplay instead of reloading models and textures.
+- **Graphic design tools** — graphic editors like Photoshop or Figma clone existing shapes, layers, and style configurations when duplicating canvas elements.
+- **Operating system process creation** — the POSIX `fork()` system call acts as a prototype mechanism by duplicating the address space and resources of the calling parent process.
+- **Document templates** — word processors and spreadsheet applications clone pre-built document templates with default layouts, styles, and headers when creating a new file.
+- **GUI component libraries** — UI builders clone template widgets (buttons, cards, dialogs) that carry default themes and styling.
+
+## Relationship to Other Patterns
+
+- **Prototype vs Factory Method** — Factory Method uses inheritance to vary object creation via subclasses, whereas Prototype uses delegation by copying an existing prototype instance.
+- **Prototype vs Abstract Factory** — Abstract Factory often stores a set of Prototypes and clones them inside its factory methods instead of instantiating concrete classes.
+- **Prototype vs Memento** — Prototype creates a new, independent copy of an object for continued mutation, while Memento captures an opaque snapshot of state specifically for rollback and restoration.
+- **Prototype + Composite** — Prototype can be used to deep-copy complex composite hierarchies (such as ASTs or document tree nodes).
+- **Prototype vs Singleton** — Singleton enforces exactly one instance of a class across the application, whereas Prototype produces multiple distinct copies from an initial instance.
+
+## Key Points
+
+- Prototype delegates the creation of duplicate objects to the objects themselves via a `clone()` method.
+- Concrete classes use their copy constructors to safely copy both public and private fields without breaking encapsulation.
+- A prototype registry acts as an object catalog where clients can retrieve pre-configured clones by key without coupling to concrete classes.
+- Deep copying must be handled explicitly when prototypes own raw pointers or nested dynamic resources.
+- Prototype avoids repetitive and expensive initialization by copying an already-configured baseline object.
+
 # Visitor Design Pattern
+
+Visitor is a behavioral design pattern that lets you separate algorithms and operations from the objects on which they operate. By moving operations into separate visitor classes, you can add new behaviors to existing class hierarchies without modifying their source code. Visitor uses double dispatch to execute the appropriate operation based on both the type of the visitor and the type of the element. This section covers the intent, the problem the pattern solves, the standard structure, a complete C++ implementation, and the situations where the pattern earns its keep.
+
+## Intent
+
+Represent an operation to be performed on the elements of an object structure. Visitor lets you define a new operation without changing the classes of the elements on which it operates.
+
+In plainer terms: imagine a document consisting of various elements like `Heading`, `Paragraph`, and `Image`. If you want to add operations such as exporting to Markdown, generating HTML, or calculating word counts, adding methods like `exportMarkdown()` and `exportHTML()` directly to every element class pollutes their design and violates the Open/Closed Principle. Instead, you create separate visitor classes (`MarkdownExportVisitor`, `HtmlExportVisitor`) and let each element `accept()` the visitor, routing execution to the correct visitor method via double dispatch.
+
+## The Problem It Solves
+
+When an application works with a structured hierarchy of classes (such as an Abstract Syntax Tree or a document model), you often need to perform various unrelated operations across all nodes. Adding a new method to the base interface requires updating every single concrete subclass in the hierarchy. Furthermore, if you attempt to keep operations external by inspecting types with `dynamic_cast` or `typeid`, the code degenerates into brittle conditional cascades scattered across the codebase.
+
+### Document Traversal with Type Inspection
+
+This naive document exporter relies on type checks to process different elements, requiring modifications whenever new element types are added:
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+class Element {
+public:
+    virtual ~Element() = default;
+};
+
+class Heading : public Element {
+public:
+    int level;
+    std::string text;
+    Heading(int l, std::string t) : level(l), text(std::move(t)) {}
+};
+
+class Paragraph : public Element {
+public:
+    std::string text;
+    explicit Paragraph(std::string t) : text(std::move(txt)) {}
+};
+
+void exportToMarkdown(const std::vector<std::unique_ptr<Element>>& doc) {
+    for (const auto& elem : doc) {
+        if (auto* h = dynamic_cast<Heading*>(elem.get())) {
+            std::cout << std::string(h->level, '#') << " "
+                      << h->text << "\n";
+        } else if (auto* p = dynamic_cast<Paragraph*>(elem.get())) {
+            std::cout << p->text << "\n\n";
+        }
+    }
+}
+
+int main() {
+    std::vector<std::unique_ptr<Element>> doc;
+    doc.push_back(std::make_unique<Heading>(1, "Introduction"));
+    doc.push_back(std::make_unique<Paragraph>("This is naive rendering."));
+
+    exportToMarkdown(doc);
+    return 0;
+}
+```
+
+```text
+# Introduction
+This is naive rendering.
+
+```
+
+This type-inspection approach causes several problems:
+
+- **Violates the Open/Closed Principle** — adding a new element type requires finding and updating every external function and adding another `dynamic_cast` branch.
+- **Pollutes element classes** — putting all export, rendering, and analysis methods directly inside element classes violates the Single Responsibility Principle.
+- **Runtime overhead and fragility** — chained `dynamic_cast` checks add runtime cost and easily fail silently if a type case is omitted.
+- **Scattered operation logic** — the logic for a single operation (e.g., HTML rendering) is fragmented across many classes rather than cohesive in one place.
+
+## The Solution
+
+Use double dispatch to decouple elements from the operations performed on them. The `Visitor` interface declares overloaded `visit()` methods for each concrete element class. The `Element` interface declares an `accept(Visitor&)` method. When `element->accept(visitor)` is called, the concrete element calls `visitor.visit(*this)`. The first dispatch resolves the concrete element's `accept()` method polymorphically, and the second dispatch resolves the correct `visit()` overload at compile time based on the element's concrete `*this` type.
+
+### Participants
+
+- **Visitor** — `DocumentVisitor`; interface declaring a `visit()` method for each concrete element type.
+- **ConcreteVisitor** — `MarkdownExportVisitor`, `HtmlExportVisitor`; implements the operation for each concrete element type.
+- **Element** — `DocumentElement`; interface declaring the `accept(DocumentVisitor&)` method.
+- **ConcreteElement** — `Heading`, `Paragraph`, `Image`; implements `accept()` by calling `visitor.visit(*this)`.
+- **ObjectStructure** — `Document`; a collection or composite structure of elements that accepts a visitor and iterates over its elements.
+
+### Structure
+
+```mermaid
+classDiagram
+    class DocumentVisitor {
+        <<interface>>
+        +visit(heading: Heading) void*
+        +visit(paragraph: Paragraph) void*
+        +visit(image: Image) void*
+    }
+    class MarkdownExportVisitor {
+        +visit(heading: Heading) void
+        +visit(paragraph: Paragraph) void
+        +visit(image: Image) void
+    }
+    class HtmlExportVisitor {
+        +visit(heading: Heading) void
+        +visit(paragraph: Paragraph) void
+        +visit(image: Image) void
+    }
+    class DocumentElement {
+        <<interface>>
+        +accept(visitor: DocumentVisitor) void*
+    }
+    class Heading {
+        -level: int
+        -text: string
+        +getLevel() int
+        +getText() string
+        +accept(visitor: DocumentVisitor) void
+    }
+    class Paragraph {
+        -text: string
+        +getText() string
+        +accept(visitor: DocumentVisitor) void
+    }
+    class Image {
+        -altText: string
+        -url: string
+        +getAltText() string
+        +getUrl() string
+        +accept(visitor: DocumentVisitor) void
+    }
+    class Document {
+        -elements: vector~unique_ptr~DocumentElement~~
+        +addElement(elem: unique_ptr~DocumentElement~) void
+        +accept(visitor: DocumentVisitor) void
+    }
+    DocumentVisitor <|-- MarkdownExportVisitor
+    DocumentVisitor <|-- HtmlExportVisitor
+    DocumentElement <|-- Heading
+    DocumentElement <|-- Paragraph
+    DocumentElement <|-- Image
+    Heading ..> DocumentVisitor : calls visit
+    Paragraph ..> DocumentVisitor : calls visit
+    Image ..> DocumentVisitor : calls visit
+    Document o-- DocumentElement
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Forward declarations
+class Heading;
+class Paragraph;
+class Image;
+
+// Visitor Interface
+class DocumentVisitor {
+public:
+    virtual ~DocumentVisitor() = default;
+    virtual void visit(const Heading& heading) = 0;
+    virtual void visit(const Paragraph& paragraph) = 0;
+    virtual void visit(const Image& image) = 0;
+};
+
+// Element Interface
+class DocumentElement {
+public:
+    virtual ~DocumentElement() = default;
+    virtual void accept(DocumentVisitor& visitor) const = 0;
+};
+
+// Concrete Element: Heading
+class Heading : public DocumentElement {
+private:
+    int level;
+    std::string text;
+public:
+    Heading(int lvl, std::string txt)
+        : level(lvl), text(std::move(txt)) {}
+
+    int getLevel() const { return level; }
+    const std::string& getText() const { return text; }
+
+    void accept(DocumentVisitor& visitor) const override {
+        visitor.visit(*this);
+    }
+};
+
+// Concrete Element: Paragraph
+class Paragraph : public DocumentElement {
+private:
+    std::string text;
+public:
+    explicit Paragraph(std::string txt) : text(std::move(txt)) {}
+
+    const std::string& getText() const { return text; }
+
+    void accept(DocumentVisitor& visitor) const override {
+        visitor.visit(*this);
+    }
+};
+
+// Concrete Element: Image
+class Image : public DocumentElement {
+private:
+    std::string altText;
+    std::string url;
+public:
+    Image(std::string alt, std::string link)
+        : altText(std::move(alt)), url(std::move(link)) {}
+
+    const std::string& getAltText() const { return altText; }
+    const std::string& getUrl() const { return url; }
+
+    void accept(DocumentVisitor& visitor) const override {
+        visitor.visit(*this);
+    }
+};
+
+// Concrete Visitor 1: Markdown Exporter
+class MarkdownExportVisitor : public DocumentVisitor {
+public:
+    void visit(const Heading& heading) override {
+        std::cout << std::string(heading.getLevel(), '#') << " "
+                  << heading.getText() << "\n";
+    }
+
+    void visit(const Paragraph& paragraph) override {
+        std::cout << paragraph.getText() << "\n\n";
+    }
+
+    void visit(const Image& image) override {
+        std::cout << "![" << image.getAltText() << "]("
+                  << image.getUrl() << ")\n\n";
+    }
+};
+
+// Concrete Visitor 2: HTML Exporter
+class HtmlExportVisitor : public DocumentVisitor {
+public:
+    void visit(const Heading& heading) override {
+        std::cout << "<h" << heading.getLevel() << ">"
+                  << heading.getText() << "</h"
+                  << heading.getLevel() << ">\n";
+    }
+
+    void visit(const Paragraph& paragraph) override {
+        std::cout << "<p>" << paragraph.getText() << "</p>\n";
+    }
+
+    void visit(const Image& image) override {
+        std::cout << "<img src=\"" << image.getUrl()
+                  << "\" alt=\"" << image.getAltText() << "\" />\n";
+    }
+};
+
+// Object Structure: Document holding collection of elements
+class Document {
+private:
+    std::vector<std::unique_ptr<DocumentElement>> elements;
+public:
+    void addElement(std::unique_ptr<DocumentElement> elem) {
+        elements.push_back(std::move(elem));
+    }
+
+    void accept(DocumentVisitor& visitor) const {
+        for (const auto& elem : elements) {
+            elem->accept(visitor);
+        }
+    }
+};
+
+int main() {
+    Document doc;
+    doc.addElement(std::make_unique<Heading>(1, "Low-Level Design"));
+    doc.addElement(std::make_unique<Paragraph>(
+        "Visitor pattern decouples algorithms from data structures."));
+    doc.addElement(std::make_unique<Image>("UML Diagram", "uml.png"));
+
+    std::cout << "--- Markdown Export ---\n";
+    MarkdownExportVisitor mdVisitor;
+    doc.accept(mdVisitor);
+
+    std::cout << "--- HTML Export ---\n";
+    HtmlExportVisitor htmlVisitor;
+    doc.accept(htmlVisitor);
+
+    return 0;
+}
+```
+
+```text
+--- Markdown Export ---
+# Low-Level Design
+Visitor pattern decouples algorithms from data structures.
+
+![UML Diagram](uml.png)
+
+--- HTML Export ---
+<h1>Low-Level Design</h1>
+<p>Visitor pattern decouples algorithms from data structures.</p>
+<img src="uml.png" alt="UML Diagram" />
+```
+
+## How It Works
+
+The client creates a collection of elements (e.g. `Document`) and passes a concrete visitor instance to `doc.accept(visitor)`. The document iterates through its elements, invoking `elem->accept(visitor)` on each element pointer. The concrete element executes `visitor.visit(*this)`, which binds to the specific overloaded `visit()` method for that element type. Through this two-step dynamic-plus-static dispatch sequence, the correct operation runs without needing type checks or downcasting.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Doc as Document
+    participant Heading as Heading (Element)
+    participant Visitor as HtmlExportVisitor
+
+    Client->>Doc: accept(visitor)
+    Doc->>Heading: accept(visitor)
+    Heading->>Visitor: visit(*this)
+    Visitor-->>Heading: renders <h1>Heading</h1>
+    Heading-->>Doc: complete
+    Doc-->>Client: traversal finished
+```
+
+## When to Use
+
+- When you need to perform multiple distinct and unrelated operations across an object structure without cluttering the element classes.
+- When the object hierarchy (element classes) is relatively stable, but new operations are added frequently.
+- When an algorithm needs to accumulate state as it traverses complex structures (e.g., calculating totals, collecting metrics, building symbol tables).
+- When implementing compiler frontends, AST processing pipelines, linters, or document transformers.
+
+## When Not to Use
+
+- When the element class hierarchy changes frequently — adding a new element class requires updating the `Visitor` interface and every concrete visitor implementation.
+- When the visitor requires access to private element fields that would break encapsulation if exposed.
+- When simple polymorphism (`virtual void execute()`) on the element hierarchy is sufficient and operations are tightly bound to the domain objects.
+
+## Real-World Examples
+
+- **Compiler passes & AST processing** — compilers (e.g., Clang, Roslyn, Babel) use visitors for type checking, dead-code elimination, optimization passes, and intermediate code generation.
+- **Document format converters** — tools like Pandoc traverse a document tree to render outputs into PDF, HTML, LaTeX, or EPUB formats.
+- **XML / DOM inspectors** — traversing XML and HTML DOM trees to validate schema rules, evaluate XPath queries, or apply CSS styles.
+- **Static analysis and linters** — static code analyzers (e.g., SonarQube, ESLint) traverse syntax trees with rule visitors to report code smells and security vulnerabilities.
+- **Financial reports & tax calculation** — billing engines visit shopping cart items (products, warranties, shipping lines) to compute region-specific taxes and duties.
+
+## Relationship to Other Patterns
+
+- **Visitor vs Iterator** — Iterator traverses a collection and exposes elements one by one to the client, whereas Visitor traverses a heterogeneous object structure and executes type-specific operations via double dispatch.
+- **Visitor + Composite** — Visitor is frequently combined with Composite to execute operations across complex recursive tree structures (like syntax trees or scene graphs).
+- **Visitor vs Strategy** — Strategy varies an algorithm for a single class via composition, whereas Visitor applies an operation across an entire hierarchy of different classes.
+- **Visitor vs Command** — Command encapsulates a single request as an object, whereas Visitor encapsulates an operation that acts across an entire structure of diverse elements.
+
+## Key Points
+
+- Visitor uses double dispatch (`element->accept(v)` followed by `v.visit(*this)`) to execute the right method based on both visitor and element types.
+- It enables adding new operations to existing class hierarchies without changing their source code.
+- Operations are centralized inside cohesive visitor classes rather than fragmented across dozens of element classes.
+- Visitor works best when the element hierarchy is stable; adding a new concrete element forces changes to all visitors.
+- Visitors can maintain internal state across elements as they traverse an object structure.
 
 # Memento Design Pattern
 
+Memento is a behavioral design pattern that lets you capture and externalize an object's internal state without violating encapsulation, so that the object can be restored to this state later. Memento provides the foundation for undo/redo mechanisms, rollback operations, and checkpoint systems by storing opaque snapshots of an originator's state managed by a caretaker. This section covers the intent, the problem the pattern solves, the standard structure, a complete C++ implementation with undo and redo stacks, and the situations where the pattern earns its keep.
+
+## Intent
+
+Without violating encapsulation, capture and externalize an object's internal state so that the object can be restored to this state later. The pattern preserves class boundaries by keeping state private to the originator while allowing external caretakers to store and organize snapshots.
+
+In plainer terms: in a text editor, IDE, or graphic application, users expect an "Undo" command. If the history manager reads and writes private editor fields directly (such as cursor offset, selection range, and text buffer), encapsulation is shattered. Instead, the `TextEditor` (Originator) packages its state into an opaque `EditorMemento`. The `HistoryManager` (Caretaker) stores snapshots on a stack without inspecting their contents. When undo is triggered, the caretaker passes the memento back to the editor to restore itself.
+
+## The Problem It Solves
+
+Implementing an undo/redo feature requires recording an object's past states. The straightforward approach is to make internal fields public or provide public getters and setters so a history manager can read and overwrite fields directly. However, exposing internal fields breaks encapsulation, tightly couples the history manager to internal implementation details, and allows external code to corrupt the object's state.
+
+### State Exposure That Breaks Encapsulation
+
+This naive text editor exposes its private fields publicly so a history class can record and restore state:
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+
+class TextEditor {
+public:
+    std::string text;
+    int cursorPosition;
+
+    void write(const std::string& words) {
+        text += words;
+        cursorPosition = static_cast<int>(text.length());
+    }
+};
+
+struct EditorState {
+    std::string text;
+    int cursorPosition;
+};
+
+class History {
+private:
+    std::vector<EditorState> history;
+public:
+    void push(const TextEditor& editor) {
+        history.push_back({editor.text, editor.cursorPosition});
+    }
+
+    void undo(TextEditor& editor) {
+        if (history.empty()) return;
+        EditorState last = history.back();
+        history.pop_back();
+        editor.text = last.text;
+        editor.cursorPosition = last.cursorPosition;
+    }
+};
+
+int main() {
+    TextEditor editor;
+    History history;
+
+    history.push(editor);
+    editor.write("Hello ");
+    history.push(editor);
+    editor.write("World!");
+
+    std::cout << "Current Text: " << editor.text << "\n";
+
+    history.undo(editor);
+    std::cout << "After Undo 1: " << editor.text << "\n";
+
+    history.undo(editor);
+    std::cout << "After Undo 2: " << editor.text << "\n";
+
+    return 0;
+}
+```
+
+```text
+Current Text: Hello World!
+After Undo 1: Hello 
+After Undo 2: 
+```
+
+This naive approach causes several problems:
+
+- **Violates encapsulation** — private details (text buffer, cursor position) are made public or accessible through wide getters/setters.
+- **Tight coupling** — any refactoring of `TextEditor`'s internal data structures forces cascading changes to `History` and `EditorState`.
+- **State vulnerability** — external classes can mutate internal fields arbitrarily, leading to inconsistent or invalid states.
+- **Single Responsibility violation** — the history manager becomes responsible for knowing how to reconstruct the editor's internal state.
+
+## The Solution
+
+Delegate state snapshotting and restoration directly to the `Originator`. The `Originator` creates a `Memento` object containing a snapshot of its state and can restore its state when given a `Memento`. The `Memento` provides a restricted interface: it exposes full access to the `Originator` (e.g. via `friend class` in C++), but acts as an opaque black box to the `Caretaker`. The `Caretaker` stores mementos in undo/redo stacks without ever reading or modifying their contents.
+
+### Participants
+
+- **Originator** — `TextEditor`; the object whose state needs to be saved and restored; produces and consumes mementos (`save()`, `restore()`).
+- **Memento** — `EditorMemento`; stores the internal state of the originator; keeps state private and accessible only to the originator.
+- **Caretaker** — `HistoryManager`; manages the lifetime and storage of mementos (undo/redo stacks) without inspecting or modifying them.
+- **Client** — triggers editing actions and requests undo/redo operations from the caretaker.
+
+### Structure
+
+```mermaid
+classDiagram
+    class TextEditor {
+        -content: string
+        -cursorPosition: int
+        +write(text: string) void
+        +show() void
+        +save() unique_ptr~EditorMemento~
+        +restore(memento: EditorMemento) void
+    }
+    class EditorMemento {
+        -content: string
+        -cursorPosition: int
+        -EditorMemento(text: string, cursor: int)
+    }
+    class HistoryManager {
+        -undoStack: vector~unique_ptr~EditorMemento~~
+        -redoStack: vector~unique_ptr~EditorMemento~~
+        +backup(editor: TextEditor) void
+        +undo(editor: TextEditor) void
+        +redo(editor: TextEditor) void
+    }
+    EditorMemento ..> TextEditor : friend class (wide interface)
+    HistoryManager o-- EditorMemento : stores (narrow interface)
+    HistoryManager ..> TextEditor : requests save and restore
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Forward declaration
+class TextEditor;
+
+// Memento: stores internal state of TextEditor.
+// State fields and constructor are private to preserve encapsulation.
+// TextEditor is declared as a friend to grant it access.
+class EditorMemento {
+private:
+    friend class TextEditor;
+    std::string content;
+    int cursorPosition;
+
+    EditorMemento(std::string text, int cursor)
+        : content(std::move(text)), cursorPosition(cursor) {}
+
+public:
+    virtual ~EditorMemento() = default;
+};
+
+// Originator: TextEditor creates and restores mementos.
+class TextEditor {
+private:
+    std::string content;
+    int cursorPosition;
+
+public:
+    TextEditor() : content(""), cursorPosition(0) {}
+
+    void write(const std::string& text) {
+        content += text;
+        cursorPosition = static_cast<int>(content.length());
+    }
+
+    void show() const {
+        std::cout << "Editor Content: \"" << content
+                  << "\" | Cursor at: " << cursorPosition << "\n";
+    }
+
+    // Creates a snapshot memento
+    std::unique_ptr<EditorMemento> save() const {
+        return std::unique_ptr<EditorMemento>(
+            new EditorMemento(content, cursorPosition));
+    }
+
+    // Restores state from a memento
+    void restore(const EditorMemento& memento) {
+        content = memento.content;
+        cursorPosition = memento.cursorPosition;
+    }
+};
+
+// Caretaker: HistoryManager manages saved mementos without inspecting them.
+class HistoryManager {
+private:
+    std::vector<std::unique_ptr<EditorMemento>> undoStack;
+    std::vector<std::unique_ptr<EditorMemento>> redoStack;
+
+public:
+    void backup(TextEditor& editor) {
+        undoStack.push_back(editor.save());
+        redoStack.clear(); // Clear redo stack on new operation
+    }
+
+    void undo(TextEditor& editor) {
+        if (undoStack.empty()) {
+            std::cout << "Nothing to undo.\n";
+            return;
+        }
+        // Save current state to redo stack before restoring
+        redoStack.push_back(editor.save());
+
+        auto memento = std::move(undoStack.back());
+        undoStack.pop_back();
+        editor.restore(*memento);
+    }
+
+    void redo(TextEditor& editor) {
+        if (redoStack.empty()) {
+            std::cout << "Nothing to redo.\n";
+            return;
+        }
+        // Save current state to undo stack before restoring
+        undoStack.push_back(editor.save());
+
+        auto memento = std::move(redoStack.back());
+        redoStack.pop_back();
+        editor.restore(*memento);
+    }
+};
+
+int main() {
+    TextEditor editor;
+    HistoryManager history;
+
+    // Initial state
+    history.backup(editor);
+    editor.write("Design Patterns ");
+    editor.show();
+
+    // Second modification
+    history.backup(editor);
+    editor.write("in Modern C++");
+    editor.show();
+
+    // Perform Undo
+    std::cout << "--- Undo Operation ---\n";
+    history.undo(editor);
+    editor.show();
+
+    // Perform Redo
+    std::cout << "--- Redo Operation ---\n";
+    history.redo(editor);
+    editor.show();
+
+    return 0;
+}
+```
+
+```text
+Editor Content: "Design Patterns " | Cursor at: 16
+Editor Content: "Design Patterns in Modern C++" | Cursor at: 29
+--- Undo Operation ---
+Editor Content: "Design Patterns " | Cursor at: 16
+--- Redo Operation ---
+Editor Content: "Design Patterns in Modern C++" | Cursor at: 29
+```
+
+## How It Works
+
+Before modifying state, the client or caretaker asks the `TextEditor` to create a backup by calling `editor.save()`. The editor packages its private fields into an `EditorMemento` and returns it as a smart pointer. The `HistoryManager` pushes this opaque memento onto its `undoStack`. When the user triggers an undo action, the caretaker saves the current state to the `redoStack`, pops the most recent memento from `undoStack`, and calls `editor.restore(*memento)`. The editor extracts its saved state and resets its internal attributes without exposing data to the caretaker.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Caretaker as HistoryManager
+    participant Originator as TextEditor
+    participant Memento as EditorMemento
+
+    Client->>Caretaker: backup(editor)
+    Caretaker->>Originator: save()
+    Originator->>Memento: new EditorMemento(content, cursor)
+    Originator-->>Caretaker: unique_ptr~EditorMemento~
+    Client->>Originator: write("in Modern C++")
+    Client->>Caretaker: undo(editor)
+    Caretaker->>Originator: restore(memento)
+    Originator->>Originator: reset content and cursor
+```
+
+## When to Use
+
+- When you need to produce snapshots of an object's state to implement undo/redo, history tracking, or rollback mechanisms.
+- When direct access to an object's fields or getters/setters would violate encapsulation and expose private implementation details.
+- When implementing transaction rollbacks or database checkpointing where operations may fail and need full state restoration.
+- When implementing save states or checkpoints in games.
+
+## When Not to Use
+
+- When saving snapshots consumes significant RAM or object states are massive — frequent snapshots can lead to memory exhaustion unless differential/delta compression is used.
+- When the caretaker cannot manage the lifecycle of mementos properly, causing memory leaks in unmanaged languages.
+- When the state is trivial and objects are immutable or stateless.
+
+## Real-World Examples
+
+- **Text and code editors** — IDEs (VS Code, IntelliJ) and editors maintain undo/redo histories containing text buffer snapshots or edit deltas.
+- **Database transaction rollbacks** — relational databases create savepoints/snapshots during transactions, allowing rollbacks to previous consistent states on error.
+- **Game save/checkpoint systems** — games serialize player stats, inventory, and world states into save files or quicksave slots to restore upon player death.
+- **Graphic editing software** — vector and raster design apps (Photoshop, Illustrator) store layer states in history panels to allow step-by-step undo.
+- **Web browser history & state restoration** — browsers save session tab state and form entries when navigating back and forward or restoring after crashes.
+
+## Relationship to Other Patterns
+
+- **Memento vs Command** — Command encapsulates an action and can implement undo by executing reverse commands (`undo()`), whereas Memento saves the complete state snapshot before execution. They are often combined for robust undo systems.
+- **Memento vs Prototype** — Prototype clones an entire object for independent use and mutation, whereas Memento captures an internal state snapshot solely for restoration by the originator.
+- **Memento vs State** — State models transitions and alters behavior dynamically at runtime, while Memento captures passive snapshots of state at specific points in time.
+- **Memento + Caretaker** — The Caretaker can use the Command pattern to hold mementos and execute undo/redo actions.
+
+## Key Points
+
+- Memento captures and restores internal state without exposing private fields or breaking encapsulation.
+- It uses a dual-interface model: a wide interface accessible only to the Originator (via `friend`), and a narrow opaque interface presented to the Caretaker.
+- The Caretaker stores and manages memento lifetimes in undo/redo stacks without reading or modifying their contents.
+- Snapshot frequency and memory footprint must be managed when saving large object states.
+- Memento is the canonical design pattern for undo/redo, save states, and transactional rollbacks.
+
 # Null Object Pattern
+
+Null Object is a behavioral design pattern that provides a surrogate object with neutral ("do nothing") behavior in place of a null reference or pointer. Instead of returning `nullptr` and forcing callers to write defensive `if (ptr != nullptr)` checks throughout their code, a system returns a concrete Null Object that implements the expected interface. This section covers the intent, the problem the pattern solves, the standard structure, a complete C++ implementation, and the situations where the pattern earns its keep.
+
+## Intent
+
+Provide an object as a surrogate for the lack of an object of a given type. The Null Object provides intelligent do-nothing behavior, taking the place of `nullptr` so that clients can treat both real and null objects uniformly without conditional checks.
+
+In plainer terms: imagine an `OrderService` that accepts an optional `Logger` and `DiscountPolicy`. If no logger is provided, the service defaults to `nullptr`, forcing every method to guard calls with `if (logger != nullptr) logger->log(...)`. Forgetting even one check leads to a crash. By providing a `NullLogger` whose `log()` method does nothing, the service can invoke `logger->log(...)` unconditionally and safely.
+
+## The Problem It Solves
+
+When dependencies or results are optional, functions commonly return or store `nullptr`. This forces every client to sprinkle defensive `if (ptr != nullptr)` checks before every method invocation. This defensive boilerplate clutters business logic, reduces code readability, and introduces severe crash risks if a developer misses a null check.
+
+### Defensive Null Checking in Client Code
+
+This naive order processor checks for `nullptr` on every logging call to prevent segmentation faults:
+
+```cpp
+#include <iostream>
+#include <string>
+
+class Logger {
+public:
+    virtual ~Logger() = default;
+    virtual void log(const std::string& message) = 0;
+};
+
+class ConsoleLogger : public Logger {
+public:
+    void log(const std::string& message) override {
+        std::cout << "[LOG]: " << message << "\n";
+    }
+};
+
+class OrderService {
+private:
+    Logger* logger; // Optional dependency (can be nullptr)
+public:
+    explicit OrderService(Logger* log = nullptr) : logger(log) {}
+
+    void processOrder(int orderId, double amount) {
+        if (logger != nullptr) {
+            logger->log("Processing order #" + std::to_string(orderId));
+        }
+
+        std::cout << "Order #" << orderId
+                  << " processed for $" << amount << "\n";
+
+        if (logger != nullptr) {
+            logger->log("Completed order #" + std::to_string(orderId));
+        }
+    }
+};
+
+int main() {
+    ConsoleLogger consoleLogger;
+    OrderService serviceWithLog(&consoleLogger);
+    serviceWithLog.processOrder(101, 250.0);
+
+    std::cout << "---\n";
+
+    OrderService serviceWithoutLog(nullptr);
+    serviceWithoutLog.processOrder(102, 120.0);
+
+    return 0;
+}
+```
+
+```text
+[LOG]: Processing order #101
+Order #101 processed for $250
+[LOG]: Completed order #101
+---
+Order #102 processed for $120
+```
+
+This null-checking approach causes several problems:
+
+- **Code clutter and boilerplate** — every single interaction with the optional dependency requires conditional guards.
+- **High risk of runtime crashes** — forgetting a single `if (ptr != nullptr)` check causes fatal segmentation faults or null pointer exceptions.
+- **Scatters null-handling logic** — knowledge of what to do when a dependency is absent is duplicated across every caller rather than encapsulated in one place.
+- **Complicates testing** — unit tests must pass dummy pointers or test both null and non-null branches for every method.
+
+## The Solution
+
+Create a `NullObject` class that implements the target interface with neutral, no-op behavior (or safe default return values). When an optional dependency is omitted or an entity is not found, return or initialize with the Null Object instead of `nullptr`. Clients interact with the interface polymorphically and unconditionally, eliminating all defensive null checks.
+
+### Participants
+
+- **AbstractObject** — `Logger`; the base interface declaring the operations clients can perform.
+- **RealObject** — `ConsoleLogger`; the concrete implementation that performs real work (e.g., printing to stdout or writing to file).
+- **NullObject** — `NullLogger`; the concrete implementation that provides no-op behavior for every interface method.
+- **Client** — `OrderService`; invokes methods on the `Logger` interface unconditionally without checking for null.
+
+### Structure
+
+```mermaid
+classDiagram
+    class Logger {
+        <<interface>>
+        +log(message: string) void*
+    }
+    class ConsoleLogger {
+        +log(message: string) void
+    }
+    class NullLogger {
+        +log(message: string) void
+    }
+    class OrderService {
+        -logger: shared_ptr~Logger~
+        +OrderService(log: shared_ptr~Logger~)
+        +processOrder(orderId: int, amount: double) void
+    }
+    Logger <|-- ConsoleLogger
+    Logger <|-- NullLogger
+    OrderService --> Logger : uses unconditionally
+```
+
+### Standard Implementation
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <string>
+
+// AbstractObject: Logger interface
+class Logger {
+public:
+    virtual ~Logger() = default;
+    virtual void log(const std::string& message) = 0;
+};
+
+// RealObject: ConsoleLogger performs actual logging
+class ConsoleLogger : public Logger {
+public:
+    void log(const std::string& message) override {
+        std::cout << "[LOG]: " << message << "\n";
+    }
+};
+
+// NullObject: NullLogger provides neutral no-op behavior
+class NullLogger : public Logger {
+public:
+    void log(const std::string& /*message*/) override {
+        // Deliberate no-op: suppresses log output cleanly
+    }
+};
+
+// Client: OrderService uses Logger unconditionally
+class OrderService {
+private:
+    std::shared_ptr<Logger> logger;
+
+public:
+    explicit OrderService(std::shared_ptr<Logger> log = nullptr) {
+        if (log) {
+            logger = std::move(log);
+        } else {
+            logger = std::make_shared<NullLogger>();
+        }
+    }
+
+    void processOrder(int orderId, double amount) {
+        // No defensive null checks needed!
+        logger->log("Processing order #" + std::to_string(orderId));
+
+        std::cout << "Order #" << orderId
+                  << " processed for $" << amount << "\n";
+
+        logger->log("Completed order #" + std::to_string(orderId));
+    }
+};
+
+int main() {
+    // 1. Service configured with real logger
+    auto realLogger = std::make_shared<ConsoleLogger>();
+    OrderService serviceWithLogger(realLogger);
+    serviceWithLogger.processOrder(101, 250.0);
+
+    std::cout << "---\n";
+
+    // 2. Service configured without logger (defaults to NullLogger)
+    OrderService serviceWithoutLogger;
+    serviceWithoutLogger.processOrder(102, 120.0);
+
+    return 0;
+}
+```
+
+```text
+[LOG]: Processing order #101
+Order #101 processed for $250
+[LOG]: Completed order #101
+---
+Order #102 processed for $120
+```
+
+## How It Works
+
+When `OrderService` is instantiated without an explicit logger, its constructor assigns a `NullLogger` instance to its `logger` member. When `processOrder()` executes, it calls `logger->log(...)`. If configured with `ConsoleLogger`, the message is printed to stdout. If configured with `NullLogger`, the empty `log()` method executes silently. In both cases, the client executes identical code paths with no branching or null checks.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Service as OrderService
+    participant Logger as NullLogger
+
+    Client->>Service: OrderService(nullptr)
+    Service->>Service: logger = make_shared~NullLogger~()
+    Client->>Service: processOrder(102, 120.0)
+    Service->>Logger: log("Processing order #102")
+    Note over Logger: Executes empty no-op method
+    Service->>Service: prints order details
+    Service->>Logger: log("Completed order #102")
+    Note over Logger: Executes empty no-op method
+    Service-->>Client: order processed cleanly
+```
+
+## When to Use
+
+- When an object needs an optional collaborator or dependency, but you want to avoid scattering `if (ptr != nullptr)` checks across all callers.
+- When default or fallback behavior for a missing component is simply to do nothing or return a neutral value (such as `0`, `""`, or an empty list).
+- When writing unit tests and you need simple stubs that fulfill interface contracts without side effects.
+- When designing UI component frameworks where default event listeners should do nothing until assigned.
+
+## When Not to Use
+
+- When the absence of an object represents an exceptional or error condition that callers must explicitly catch and handle.
+- When client code needs to take fundamentally different paths based on whether an object exists (in which case `std::optional` or explicit error handling is clearer).
+- When hiding the null state masks bugs or makes diagnosing missing data harder.
+
+## Real-World Examples
+
+- **Logging frameworks** — libraries like `spdlog`, `log4j`, or `SLF4J` provide `NOPLogger` or `NullAppender` so applications can disable logging with zero runtime null checking.
+- **Event handlers & callbacks** — GUI toolkits and game engines initialize mouse/keyboard event listeners with empty no-op handlers to avoid checking if a callback is registered before invoking it.
+- **Test doubles & stubs** — mock frameworks generate null objects (stubs) to satisfy method signatures in tests without executing business logic.
+- **Null iterators** — standard collections and graph libraries provide empty iterators whose `hasNext()` always returns `false`.
+- **Specialized search fallbacks** — user search repositories returning a `GuestUser` or `AnonymousUser` object with default permissions when a user lookup returns empty.
+
+## Relationship to Other Patterns
+
+- **Null Object vs State** — Null Object can be seen as a special case of the State pattern where one state provides neutral no-op behavior.
+- **Null Object vs Strategy** — Null Object can serve as a default "no-op" strategy (e.g. `NoDiscountStrategy`) in a Strategy hierarchy.
+- **Null Object vs Singleton** — Null Object is often implemented as a Singleton because a single stateless null instance can be shared across all clients.
+- **Null Object vs Optional (`std::optional`)** — `std::optional` forces the caller to explicitly check for the presence of a value, whereas Null Object provides transparent polymorphism so the caller never needs to check.
+
+## Key Points
+
+- Null Object provides a polymorphic surrogate with do-nothing behavior in place of a null reference.
+- It eliminates repetitive `if (ptr != nullptr)` checks and protects against null pointer crashes.
+- Client code treats real and null collaborators uniformly through a shared interface.
+- Null Object is frequently combined with Singleton since stateless null objects can be shared safely.
+- Use Null Object when missing collaborators are expected and do-nothing is the desired default behavior.
