@@ -1,0 +1,6 @@
+services:
+  md2pdf:
+    build: .
+    image: md2pdf:latest
+    volumes:
+      - ./workdir:/data
